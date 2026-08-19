@@ -12,7 +12,10 @@ import { colors } from '../lib/theme';
 
 export function Wordmark({ size = 34 }: { size?: number }) {
   return (
-    <Text className="font-displaybold text-foam" style={{ fontSize: size, letterSpacing: -1 }}>
+    <Text
+      className="font-wordmark text-foam"
+      style={{ fontSize: size, letterSpacing: size * -0.02 }}
+    >
       ripple
     </Text>
   );

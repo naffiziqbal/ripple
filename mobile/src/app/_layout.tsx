@@ -4,6 +4,7 @@ import {
   AtkinsonHyperlegible_400Regular,
   AtkinsonHyperlegible_700Bold,
 } from '@expo-google-fonts/atkinson-hyperlegible';
+import { Comfortaa_700Bold } from '@expo-google-fonts/comfortaa';
 import { Sora_500Medium, Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
@@ -60,6 +61,7 @@ export default function RootLayout() {
     Sora_500Medium,
     Sora_600SemiBold,
     Sora_700Bold,
+    Comfortaa_700Bold,
     AtkinsonHyperlegible_400Regular,
     AtkinsonHyperlegible_700Bold,
   });

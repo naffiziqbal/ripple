@@ -22,6 +22,7 @@ module.exports = {
         glint: '#5FD3C7',
       },
       fontFamily: {
+        wordmark: ['Comfortaa_700Bold'],
         display: ['Sora_600SemiBold'],
         displaybold: ['Sora_700Bold'],
         displaymed: ['Sora_500Medium'],
