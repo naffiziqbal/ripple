@@ -71,6 +71,9 @@ Base URL: `http://localhost:4000` — all `/posts` routes require `Authorization
 | POST | `/auth/login` | Log in → `{ token, refreshToken, user }` |
 | POST | `/auth/refresh` | Rotate refresh token → new `{ token, refreshToken }` (reuse detection revokes all sessions) |
 | POST | `/auth/logout` | Revoke a refresh token |
+| POST | `/auth/forgot-password` | Email a 6-digit reset code `{ identifier }` (username or email; 404 if no such account) |
+| POST | `/auth/verify-reset-otp` | Verify the code (5 attempts, 10-min expiry) → short-lived `resetToken` |
+| POST | `/auth/reset-password` | Set new password `{ resetToken, password }`; revokes all sessions |
 | GET | `/auth/me` | Current user from token |
 | PUT | `/auth/device-token` | Register FCM device token `{ token }` |
 | GET | `/posts?page=1&limit=10&username=alice` | Paginated feed, newest first; optional author filter |

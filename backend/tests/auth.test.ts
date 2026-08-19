@@ -94,11 +94,102 @@ describe('POST /auth/login', () => {
   });
 });
 
-describe('POST /auth/forgot-password', () => {
-  it('returns 503 when Firebase email auth is not configured (test env)', async () => {
+describe('password reset via OTP', () => {
+  async function requestOtp(identifier: string): Promise<string | undefined> {
+    const res = await request(app).post('/auth/forgot-password').send({ identifier });
+    expect(res.status).toBe(200);
+    return res.body.devOtp;
+  }
+
+  it('completes the full flow: request → verify → reset → login with new password', async () => {
+    await signupUser(app, 'alice', 'password123', 'alice@test.local');
+    const otp = await requestOtp('alice');
+    expect(otp).toMatch(/^\d{6}$/);
+
+    const verify = await request(app)
+      .post('/auth/verify-reset-otp')
+      .send({ identifier: 'alice', otp });
+    expect(verify.status).toBe(200);
+    const { resetToken } = verify.body;
+
+    const reset = await request(app)
+      .post('/auth/reset-password')
+      .send({ resetToken, password: 'newpassword456' });
+    expect(reset.status).toBe(200);
+
+    const oldLogin = await request(app)
+      .post('/auth/login')
+      .send({ identifier: 'alice', password: 'password123' });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(app)
+      .post('/auth/login')
+      .send({ identifier: 'alice', password: 'newpassword456' });
+    expect(newLogin.status).toBe(200);
+  });
+
+  it('revokes existing sessions on reset', async () => {
+    const { token: _ } = await signupUser(app, 'alice');
+    const session = await request(app)
+      .post('/auth/login')
+      .send({ identifier: 'alice', password: 'password123' });
+    const otp = await requestOtp('alice');
+    const { resetToken } = (
+      await request(app).post('/auth/verify-reset-otp').send({ identifier: 'alice', otp })
+    ).body;
+    await request(app).post('/auth/reset-password').send({ resetToken, password: 'newpassword456' });
+
+    const refresh = await request(app)
+      .post('/auth/refresh')
+      .send({ refreshToken: session.body.refreshToken });
+    expect(refresh.status).toBe(401);
+  });
+
+  it('locks the code after five wrong attempts', async () => {
     await signupUser(app, 'alice');
-    const res = await request(app).post('/auth/forgot-password').send({ identifier: 'alice' });
-    expect(res.status).toBe(503);
+    const otp = await requestOtp('alice');
+    const wrong = otp === '000000' ? '111111' : '000000';
+
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app)
+        .post('/auth/verify-reset-otp')
+        .send({ identifier: 'alice', otp: wrong });
+      expect(res.status).toBe(401);
+    }
+    // Even the right code is now refused.
+    const res = await request(app)
+      .post('/auth/verify-reset-otp')
+      .send({ identifier: 'alice', otp });
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/attempts/i);
+  });
+
+  it('consumes the code on success', async () => {
+    await signupUser(app, 'alice');
+    const otp = await requestOtp('alice');
+    await request(app).post('/auth/verify-reset-otp').send({ identifier: 'alice', otp });
+    const replay = await request(app)
+      .post('/auth/verify-reset-otp')
+      .send({ identifier: 'alice', otp });
+    expect(replay.status).toBe(401);
+  });
+
+  it('tells the user when no account matches the identifier', async () => {
+    const res = await request(app).post('/auth/forgot-password').send({ identifier: 'ghost' });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/no account found/i);
+  });
+
+  it('rejects reset with a bad or non-reset token', async () => {
+    const { token } = await signupUser(app, 'alice'); // ordinary access token
+    const badToken = await request(app)
+      .post('/auth/reset-password')
+      .send({ resetToken: 'garbage', password: 'newpassword456' });
+    const wrongPurpose = await request(app)
+      .post('/auth/reset-password')
+      .send({ resetToken: token, password: 'newpassword456' });
+    expect(badToken.status).toBe(401);
+    expect(wrongPurpose.status).toBe(401);
   });
 });
 

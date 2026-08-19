@@ -145,11 +145,25 @@ export const api = {
   login: (identifier: string, password: string) =>
     rawRequest<AuthResponse>('/auth/login', { method: 'POST', body: { identifier, password } }),
 
-  /** Triggers Firebase's password-reset email. identifier = username or email. */
+  /** Step 1: emails a 6-digit reset code. identifier = username or email. */
   forgotPassword: (identifier: string) =>
     rawRequest<{ ok: boolean }>('/auth/forgot-password', {
       method: 'POST',
       body: { identifier },
+    }),
+
+  /** Step 2: verify the emailed code → short-lived reset token. */
+  verifyResetOtp: (identifier: string, otp: string) =>
+    rawRequest<{ resetToken: string }>('/auth/verify-reset-otp', {
+      method: 'POST',
+      body: { identifier, otp },
+    }),
+
+  /** Step 3: set the new password (revokes all sessions). */
+  resetPassword: (resetToken: string, password: string) =>
+    rawRequest<{ ok: boolean }>('/auth/reset-password', {
+      method: 'POST',
+      body: { resetToken, password },
     }),
 
   logout: (refreshToken: string) =>

@@ -20,6 +20,16 @@ export const forgotPasswordSchema = z.object({
   identifier: z.string().trim().min(1, 'Username or email is required'),
 });
 
+export const verifyOtpSchema = z.object({
+  identifier: z.string().trim().min(1, 'Username or email is required'),
+  otp: z.string().trim().regex(/^\d{6}$/, 'The code is 6 digits'),
+});
+
+export const resetPasswordSchema = z.object({
+  resetToken: z.string().min(1, 'Reset token is required'),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+});
+
 export const deviceTokenSchema = z.object({
   token: z.string().min(1, 'Device token is required'),
 });

@@ -18,6 +18,10 @@ const envSchema = z.object({
   /** Firebase Web API key (google-services.json → api_key). Enables Firebase
    *  email/password auth + reset emails; without it, auth falls back to local bcrypt. */
   FIREBASE_WEB_API_KEY: z.string().optional(),
+  /** SMTP connection URL (e.g. smtps://user:pass@smtp-relay.brevo.com:465).
+   *  Without it, outgoing mail (password-reset OTPs) is logged to stdout instead. */
+  SMTP_URL: z.string().optional(),
+  EMAIL_FROM: z.string().default('Ripple <no-reply@ripple.app>'),
 });
 
 const parsed = envSchema.safeParse(process.env);

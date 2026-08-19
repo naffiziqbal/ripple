@@ -123,8 +123,3 @@ export function deleteFirebaseUser(idToken: string): void {
     console.warn('[firebase-auth] orphan cleanup failed:', err)
   );
 }
-
-/** Firebase sends its templated password-reset email with the reset link. */
-export async function sendPasswordResetEmail(email: string): Promise<void> {
-  await identityToolkit('accounts:sendOobCode', { requestType: 'PASSWORD_RESET', email });
-}

@@ -34,6 +34,8 @@ export function createApp(): Express {
     });
     app.use('/auth/login', authLimiter);
     app.use('/auth/signup', authLimiter);
+    app.use('/auth/forgot-password', authLimiter);
+    app.use('/auth/verify-reset-otp', authLimiter);
   }
 
   app.get('/health', (_req, res) => {

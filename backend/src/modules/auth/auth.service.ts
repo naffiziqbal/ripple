@@ -1,8 +1,11 @@
 import bcrypt from 'bcryptjs';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { config } from '../../config';
 import { getPool } from '../../db';
 import { ApiError } from '../../lib/errors';
+import { setFirebasePassword } from '../../lib/firebase-admin';
+import { sendPasswordResetOtp } from '../../lib/mailer';
 import { signToken } from '../../middleware/auth';
 import type { UserDto, UserRow } from '../../types';
 import type { LoginInput, SignupInput } from './auth.schemas';
@@ -11,7 +14,6 @@ import {
   deleteFirebaseUser,
   isFirebaseAuthEnabled,
   sendAccountCreationEmail,
-  sendPasswordResetEmail,
   verifyFirebasePassword,
 } from './firebase-auth.service';
 
@@ -147,23 +149,118 @@ export async function login({ identifier, password }: LoginInput): Promise<AuthR
   return toAuthResult(user);
 }
 
+const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+const RESET_TOKEN_TTL = '10m';
+
+interface OtpRow {
+  user_id: number;
+  otp_hash: string;
+  expires_at: Date;
+  attempts: number;
+}
+
 /**
- * Trigger Firebase's password-reset email. Responds identically whether or
- * not the account exists, so the endpoint can't be used to enumerate users.
+ * In-app password reset, step 1: generate a 6-digit OTP, store its hash
+ * (one active code per user) and email it. Unknown accounts get an explicit
+ * 404 — a deliberate UX-over-enumeration tradeoff so typos don't send users
+ * to an inbox that will never fill (usernames are public in the feed anyway).
+ * Returns the OTP so the test env can exercise the flow; never expose it
+ * in responses outside tests.
  */
-export async function forgotPassword(identifier: string): Promise<void> {
-  if (!isFirebaseAuthEnabled()) {
-    throw new ApiError(503, 'Password reset is not configured on this server');
-  }
+export async function requestPasswordResetOtp(identifier: string): Promise<string | null> {
   const user = await findUserByIdentifier(identifier);
-  if (!user?.email || !user.firebase_uid) {
-    return; // silent — do not reveal whether the account exists
+  if (!user) {
+    throw ApiError.notFound('No account found with that username or email');
   }
+  if (!user.email) {
+    throw ApiError.badRequest('This account has no email on file, so it cannot be reset');
+  }
+
+  const otp = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  await getPool().query(
+    `INSERT INTO password_reset_otps (user_id, otp_hash, expires_at, attempts)
+     VALUES ($1, $2, $3, 0)
+     ON CONFLICT (user_id)
+     DO UPDATE SET otp_hash = $2, expires_at = $3, attempts = 0, created_at = now()`,
+    [user.id, createHash('sha256').update(otp).digest('hex'), new Date(Date.now() + OTP_TTL_MS)]
+  );
+
   try {
-    await sendPasswordResetEmail(user.email);
+    await sendPasswordResetOtp(user.email, otp);
   } catch (err) {
-    console.error('[auth] password reset email failed:', err);
+    console.error('[auth] reset OTP email failed:', err);
   }
+  return otp;
+}
+
+/**
+ * Step 2: check the OTP (max 5 attempts, 10-minute expiry). Success consumes
+ * the code and returns a short-lived single-purpose reset token.
+ */
+export async function verifyResetOtp(identifier: string, otp: string): Promise<string> {
+  const invalid = ApiError.unauthorized('Invalid or expired code');
+  const user = await findUserByIdentifier(identifier);
+  if (!user) throw invalid;
+
+  const pool = getPool();
+  const { rows } = await pool.query<OtpRow>(
+    'SELECT * FROM password_reset_otps WHERE user_id = $1',
+    [user.id]
+  );
+  const row = rows[0];
+  if (!row || row.expires_at.getTime() < Date.now()) throw invalid;
+  if (row.attempts >= OTP_MAX_ATTEMPTS) {
+    throw ApiError.unauthorized('Too many attempts — request a new code');
+  }
+
+  const matches = row.otp_hash === createHash('sha256').update(otp).digest('hex');
+  if (!matches) {
+    await pool.query('UPDATE password_reset_otps SET attempts = attempts + 1 WHERE user_id = $1', [
+      user.id,
+    ]);
+    throw invalid;
+  }
+
+  await pool.query('DELETE FROM password_reset_otps WHERE user_id = $1', [user.id]);
+  return jwt.sign({ id: user.id, purpose: 'password-reset' }, config.JWT_SECRET, {
+    expiresIn: RESET_TOKEN_TTL,
+  });
+}
+
+/**
+ * Step 3: set the new password — in Firebase for Firebase-backed accounts,
+ * bcrypt locally for legacy ones — and revoke every session.
+ */
+export async function resetPassword(resetToken: string, newPassword: string): Promise<void> {
+  let payload: jwt.JwtPayload & { id: number; purpose?: string };
+  try {
+    payload = jwt.verify(resetToken, config.JWT_SECRET) as typeof payload;
+  } catch {
+    throw ApiError.unauthorized('Reset session expired — request a new code');
+  }
+  if (payload.purpose !== 'password-reset') {
+    throw ApiError.unauthorized('Invalid reset token');
+  }
+
+  const user = await findUserById(payload.id);
+  if (!user) throw ApiError.unauthorized('User no longer exists');
+
+  if (user.firebase_uid && isFirebaseAuthEnabled()) {
+    // Firebase is this account's credential store — the update must land there.
+    if (!(await setFirebasePassword(user.firebase_uid, newPassword))) {
+      throw new ApiError(503, 'Password reset is temporarily unavailable');
+    }
+  } else {
+    const hash = await bcrypt.hash(newPassword, 10);
+    await getPool().query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
+  }
+
+  // Force re-login everywhere with the new password.
+  await getPool().query(
+    'UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL',
+    [user.id]
+  );
 }
 
 /**
