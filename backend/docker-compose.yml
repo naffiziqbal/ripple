@@ -1,0 +1,25 @@
+name: ripple
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ripple-postgres
+    environment:
+      POSTGRES_USER: ripple
+      POSTGRES_PASSWORD: ripple
+      POSTGRES_DB: ripple
+    ports:
+      # Host port 5433 avoids clashing with any locally running Postgres on 5432.
+      # Override with POSTGRES_PORT if 5433 is taken too.
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - ripple-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ripple -d ripple']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  ripple-pgdata:
+    name: ripple-pgdata

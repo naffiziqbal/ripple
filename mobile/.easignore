@@ -1,0 +1,40 @@
+# What EAS Build uploads = everything except the patterns here.
+# Mirrors .gitignore EXCEPT google-services.json, which the cloud build needs
+# (it stays out of git — see .gitignore).
+
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders (EAS runs prebuild itself)
+/ios
+/android
