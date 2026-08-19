@@ -6,11 +6,13 @@ import { Button, ErrorBanner, Field, Wordmark } from '../../components/ui';
 import { useAuth } from '../../context/auth-context';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupScreen() {
   const { signup } = useAuth();
   const insets = useSafeAreaInsets();
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -20,20 +22,26 @@ export default function SignupScreen() {
     username.length > 0 && !USERNAME_RE.test(username)
       ? '3–20 characters: letters, numbers, underscore'
       : undefined;
+  const emailError =
+    email.length > 0 && !EMAIL_RE.test(email.trim()) ? 'Enter a valid email address' : undefined;
   const passwordError =
     password.length > 0 && password.length < 6 ? 'At least 6 characters' : undefined;
   const confirmError =
     confirm.length > 0 && confirm !== password ? 'Passwords do not match' : undefined;
 
   const canSubmit =
-    USERNAME_RE.test(username) && password.length >= 6 && confirm === password && !submitting;
+    USERNAME_RE.test(username) &&
+    EMAIL_RE.test(email.trim()) &&
+    password.length >= 6 &&
+    confirm === password &&
+    !submitting;
 
   async function handleSubmit() {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
-      await signup(username, password);
+      await signup(username, email.trim().toLowerCase(), password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
       setSubmitting(false);
@@ -65,6 +73,17 @@ export default function SignupScreen() {
             placeholder="yourname"
           />
           <Field
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            error={emailError}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="you@example.com"
+          />
+          <Field
             label="Password"
             value={password}
             onChangeText={setPassword}
@@ -90,10 +109,12 @@ export default function SignupScreen() {
           />
         </View>
 
-        <View className="mt-8 flex-row justify-center gap-1.5">
-          <Text className="font-body text-mist">Already have an account?</Text>
+        <View className="mt-8 flex-row items-center justify-center gap-1.5">
+          <Text className="font-body text-[15px] leading-5 text-mist">
+            Already have an account?
+          </Text>
           <Link href="/login">
-            <Text className="font-display text-glint">Log in</Text>
+            <Text className="font-display text-[15px] leading-5 text-glint">Log in</Text>
           </Link>
         </View>
       </ScrollView>

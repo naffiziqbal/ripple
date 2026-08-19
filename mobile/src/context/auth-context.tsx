@@ -25,8 +25,8 @@ interface AuthContextValue {
   accessToken: string | null;
   /** True while the persisted session is being restored on app launch. */
   isRestoring: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  signup: (username: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
+  signup: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -87,8 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (username: string, password: string) => {
-      const auth = await api.login(username, password);
+    async (identifier: string, password: string) => {
+      const auth = await api.login(identifier, password);
       await persistSession({
         token: auth.token,
         refreshToken: auth.refreshToken,
@@ -99,8 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signup = useCallback(
-    async (username: string, password: string) => {
-      const auth = await api.signup(username, password);
+    async (username: string, email: string, password: string) => {
+      const auth = await api.signup(username, email, password);
       await persistSession({
         token: auth.token,
         refreshToken: auth.refreshToken,

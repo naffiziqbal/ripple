@@ -135,11 +135,22 @@ async function request<T>(
 }
 
 export const api = {
-  signup: (username: string, password: string) =>
-    rawRequest<AuthResponse>('/auth/signup', { method: 'POST', body: { username, password } }),
+  signup: (username: string, email: string, password: string) =>
+    rawRequest<AuthResponse>('/auth/signup', {
+      method: 'POST',
+      body: { username, email, password },
+    }),
 
-  login: (username: string, password: string) =>
-    rawRequest<AuthResponse>('/auth/login', { method: 'POST', body: { username, password } }),
+  /** identifier = username or email. */
+  login: (identifier: string, password: string) =>
+    rawRequest<AuthResponse>('/auth/login', { method: 'POST', body: { identifier, password } }),
+
+  /** Triggers Firebase's password-reset email. identifier = username or email. */
+  forgotPassword: (identifier: string) =>
+    rawRequest<{ ok: boolean }>('/auth/forgot-password', {
+      method: 'POST',
+      body: { identifier },
+    }),
 
   logout: (refreshToken: string) =>
     rawRequest<{ ok: boolean }>('/auth/logout', { method: 'POST', body: { refreshToken } }).catch(

@@ -3,6 +3,8 @@
 export interface User {
   id: number;
   username: string;
+  /** Present only on the viewer's own profile — never on feed authors. */
+  email?: string | null;
   createdAt: string;
 }
 

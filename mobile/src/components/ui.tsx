@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { forwardRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -63,32 +64,52 @@ interface FieldProps extends TextInputProps {
 }
 
 export const Field = forwardRef<TextInput, FieldProps>(function Field(
-  { label, error, className, onFocus, onBlur, ...rest },
+  { label, error, className, onFocus, onBlur, secureTextEntry, ...rest },
   ref
 ) {
   const [focused, setFocused] = useState(false);
+  const [hidden, setHidden] = useState(true);
+  const isSecure = Boolean(secureTextEntry);
   const borderClass = error ? 'border-koi/60' : focused ? 'border-glint/60' : 'border-foam/10';
   return (
     <View className="gap-2">
       {label ? (
         <Text className="font-displaymed text-xs uppercase tracking-[2px] text-mist">{label}</Text>
       ) : null}
-      <TextInput
-        ref={ref}
-        placeholderTextColor="rgba(126,153,149,0.6)"
-        selectionColor={colors.koi}
-        keyboardAppearance="dark"
-        className={`min-h-[52px] rounded-2xl border bg-depth px-4 py-3.5 font-body text-base text-foam ${borderClass} ${className ?? ''}`}
-        onFocus={(e) => {
-          setFocused(true);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
-        {...rest}
-      />
+      <View className={`min-h-[52px] flex-row items-center rounded-2xl border bg-depth ${borderClass}`}>
+        <TextInput
+          ref={ref}
+          placeholderTextColor="rgba(126,153,149,0.6)"
+          selectionColor={colors.koi}
+          keyboardAppearance="dark"
+          secureTextEntry={isSecure && hidden}
+          className={`flex-1 px-4 py-3.5 font-body text-base text-foam ${className ?? ''}`}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
+          {...rest}
+        />
+        {isSecure ? (
+          <Pressable
+            onPress={() => setHidden((value) => !value)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={hidden ? 'Show password' : 'Hide password'}
+            className="pr-4 active:opacity-60"
+          >
+            <Ionicons
+              name={hidden ? 'eye-outline' : 'eye-off-outline'}
+              size={20}
+              color={colors.mist}
+            />
+          </Pressable>
+        ) : null}
+      </View>
       {error ? <Text className="font-body text-sm text-koi">{error}</Text> : null}
     </View>
   );

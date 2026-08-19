@@ -8,19 +8,19 @@ import { useAuth } from '../../context/auth-context';
 export default function LoginScreen() {
   const { login } = useAuth();
   const insets = useSafeAreaInsets();
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = username.trim().length > 0 && password.length > 0;
+  const canSubmit = identifier.trim().length > 0 && password.length > 0;
 
   async function handleSubmit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      await login(username.trim(), password);
+      await login(identifier.trim(), password);
       // Navigation is handled by the protected stack once `user` is set.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -50,13 +50,14 @@ export default function LoginScreen() {
         <View className="gap-5">
           <ErrorBanner message={error} />
           <Field
-            label="Username"
-            value={username}
-            onChangeText={setUsername}
+            label="Username or email"
+            value={identifier}
+            onChangeText={setIdentifier}
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="username"
-            placeholder="yourname"
+            keyboardType="email-address"
+            placeholder="yourname or you@example.com"
             returnKeyType="next"
           />
           <Field
@@ -70,12 +71,17 @@ export default function LoginScreen() {
             onSubmitEditing={handleSubmit}
           />
           <Button title="Log in" onPress={handleSubmit} loading={submitting} disabled={!canSubmit} />
+          <Link href="/forgot" className="self-center p-1">
+            <Text className="font-display text-sm text-mist">Forgot password?</Text>
+          </Link>
         </View>
 
-        <View className="mt-8 flex-row justify-center gap-1.5">
-          <Text className="font-body text-mist">New here?</Text>
+        <View className="mt-8 flex-row items-center justify-center gap-1.5">
+          <Text className="font-body text-[15px] leading-5 text-mist">New here?</Text>
           <Link href="/signup">
-            <Text className="font-display text-glint">Create an account</Text>
+            <Text className="font-display text-[15px] leading-5 text-glint">
+              Create an account
+            </Text>
           </Link>
         </View>
       </ScrollView>
