@@ -5,13 +5,24 @@ export async function migrate(pool: Pool): Promise<void> {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       username TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
+      password_hash TEXT,
+      email TEXT,
+      firebase_uid TEXT,
       fcm_token TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
-    -- Case-insensitive uniqueness for usernames.
+    -- Upgrade path for databases created before Firebase-backed auth.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid TEXT;
+    ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+    -- Case-insensitive uniqueness for usernames and emails.
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_lower ON users (LOWER(username));
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower
+      ON users (LOWER(email)) WHERE email IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid
+      ON users (firebase_uid) WHERE firebase_uid IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS posts (
       id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

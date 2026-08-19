@@ -22,9 +22,10 @@ export function useTestDb(): void {
 export async function signupUser(
   app: Express,
   username: string,
-  password = 'password123'
-): Promise<{ token: string; user: { id: number; username: string } }> {
-  const res = await request(app).post('/auth/signup').send({ username, password });
+  password = 'password123',
+  email = `${username}@test.local`
+): Promise<{ token: string; user: { id: number; username: string; email: string } }> {
+  const res = await request(app).post('/auth/signup').send({ username, email, password });
   if (res.status !== 201) {
     throw new Error(`signup failed for ${username}: ${JSON.stringify(res.body)}`);
   }

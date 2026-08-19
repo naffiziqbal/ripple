@@ -1,16 +1,23 @@
 import { z } from 'zod';
 
-export const credentialsSchema = z.object({
+export const signupSchema = z.object({
   username: z
     .string()
     .trim()
     .regex(/^[a-zA-Z0-9_]{3,20}$/, 'Username must be 3-20 characters: letters, numbers, underscore'),
+  email: z.string().trim().toLowerCase().email('A valid email address is required'),
   password: z.string().min(6, 'Password must be at least 6 characters').max(128),
 });
 
 export const loginSchema = z.object({
-  username: z.string().trim().min(1, 'Username is required'),
+  /** Username or email address. */
+  identifier: z.string().trim().min(1, 'Username or email is required'),
   password: z.string().min(1, 'Password is required'),
+});
+
+export const forgotPasswordSchema = z.object({
+  /** Username or email address. */
+  identifier: z.string().trim().min(1, 'Username or email is required'),
 });
 
 export const deviceTokenSchema = z.object({
@@ -21,4 +28,5 @@ export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 });
 
-export type Credentials = z.infer<typeof credentialsSchema>;
+export type SignupInput = z.infer<typeof signupSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

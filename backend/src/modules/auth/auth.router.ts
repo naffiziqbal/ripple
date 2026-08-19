@@ -3,25 +3,34 @@ import { ApiError } from '../../lib/errors';
 import { authUser, requireAuth } from '../../middleware/auth';
 import { parseBody } from '../../middleware/validate';
 import {
-  credentialsSchema,
   deviceTokenSchema,
+  forgotPasswordSchema,
   loginSchema,
   refreshTokenSchema,
+  signupSchema,
 } from './auth.schemas';
 import * as authService from './auth.service';
 
 export const authRouter = Router();
 
 authRouter.post('/signup', async (req, res) => {
-  const credentials = parseBody(credentialsSchema, req);
-  const result = await authService.signup(credentials);
+  const input = parseBody(signupSchema, req);
+  const result = await authService.signup(input);
   res.status(201).json(result);
 });
 
+/** Log in with username or email as the identifier. */
 authRouter.post('/login', async (req, res) => {
-  const credentials = parseBody(loginSchema, req);
-  const result = await authService.login(credentials);
+  const input = parseBody(loginSchema, req);
+  const result = await authService.login(input);
   res.json(result);
+});
+
+/** Send Firebase's password-reset email. Always 200 (no account enumeration). */
+authRouter.post('/forgot-password', async (req, res) => {
+  const { identifier } = parseBody(forgotPasswordSchema, req);
+  await authService.forgotPassword(identifier);
+  res.json({ ok: true });
 });
 
 /** Exchange a valid refresh token for a fresh access + refresh pair. */

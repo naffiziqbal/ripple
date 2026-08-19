@@ -3,7 +3,9 @@
 export interface UserRow {
   id: number;
   username: string;
-  password_hash: string;
+  password_hash: string | null;
+  email: string | null;
+  firebase_uid: string | null;
   fcm_token: string | null;
   created_at: Date;
 }
@@ -20,6 +22,8 @@ export interface PostRow {
 export interface UserDto {
   id: number;
   username: string;
+  /** Present only on the viewer's own profile (signup/login//auth/me) — never on feed authors. */
+  email?: string | null;
   createdAt: string;
 }
 

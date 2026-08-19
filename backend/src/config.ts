@@ -15,6 +15,9 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT: z
     .string()
     .default(path.join(__dirname, '..', 'firebase-service-account.json')),
+  /** Firebase Web API key (google-services.json → api_key). Enables Firebase
+   *  email/password auth + reset emails; without it, auth falls back to local bcrypt. */
+  FIREBASE_WEB_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
