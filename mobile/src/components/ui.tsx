@@ -10,32 +10,6 @@ import {
 } from 'react-native';
 import { colors } from '../lib/theme';
 
-/** Concentric rings — the brand mark. A stone just hit the water. */
-export function RippleMark({ size = 64 }: { size?: number }) {
-  const ring = (scale: number, opacity: number, key: string) => (
-    <View
-      key={key}
-      className="absolute rounded-full border border-glint"
-      style={{
-        width: size * scale,
-        height: size * scale,
-        opacity,
-      }}
-    />
-  );
-  return (
-    <View className="items-center justify-center" style={{ width: size * 2, height: size * 2 }}>
-      {ring(2, 0.14, 'outer')}
-      {ring(1.45, 0.3, 'mid')}
-      {ring(0.95, 0.55, 'inner')}
-      <View
-        className="rounded-full bg-glint"
-        style={{ width: size * 0.16, height: size * 0.16 }}
-      />
-    </View>
-  );
-}
-
 export function Wordmark({ size = 34 }: { size?: number }) {
   return (
     <Text className="font-displaybold text-foam" style={{ fontSize: size, letterSpacing: -1 }}>

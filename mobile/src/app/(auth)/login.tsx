@@ -1,8 +1,8 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, ScrollView, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, ErrorBanner, Field, RippleMark, Wordmark } from '../../components/ui';
+import { Button, ErrorBanner, Field, Wordmark } from '../../components/ui';
 import { useAuth } from '../../context/auth-context';
 
 export default function LoginScreen() {
@@ -35,9 +35,13 @@ export default function LoginScreen() {
         style={{ paddingTop: insets.top }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="mb-12 items-center">
-          <RippleMark size={56} />
-          <View className="-mt-6 items-center gap-2">
+        <View className="mb-12 items-center gap-3">
+          <Image
+            source={require('../../../assets/images/logo.png')}
+            style={{ width: 132, height: 132 }}
+            accessibilityIgnoresInvertColors
+          />
+          <View className="items-center gap-2">
             <Wordmark />
             <Text className="font-body text-base text-mist">Say it small. Watch it spread.</Text>
           </View>
