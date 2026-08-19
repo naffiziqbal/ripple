@@ -6,7 +6,6 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   Text,
   TextInput,
@@ -17,6 +16,7 @@ import { Avatar, PostCard } from '../../../components/post-card';
 import { useToast } from '../../../components/toast';
 import { EmptyState } from '../../../components/ui';
 import { useAuth } from '../../../context/auth-context';
+import { useHeaderOffset } from '../../../lib/layout';
 import {
   useAddComment,
   useComments,
@@ -48,6 +48,7 @@ export default function PostDetailScreen() {
   const postId = Number(id);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderOffset();
   const toast = useToast();
   const { user } = useAuth();
 
@@ -115,8 +116,8 @@ export default function PostDetailScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-abyss"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}
     >
       <FlatList
         data={commentItems}

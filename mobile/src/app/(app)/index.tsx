@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PostCard } from '../../components/post-card';
 import { useToast } from '../../components/toast';
 import { EmptyState, Wordmark } from '../../components/ui';
@@ -26,6 +27,7 @@ import type { Post } from '../../lib/types';
 
 export default function FeedScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const [filterInput, setFilterInput] = useState('');
   const [filter, setFilter] = useState<string | undefined>(undefined);
@@ -80,42 +82,61 @@ export default function FeedScreen() {
 
   return (
     <View className="flex-1 bg-abyss">
-      <Stack.Screen
-        options={{
-          headerTitle: () => <Wordmark size={22} />,
-          headerRight: () => (
-            <View className="flex-row items-center gap-5">
-              <Pressable
-                onPress={() => router.push('/notifications')}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
-                }
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Custom header: full styling control (the native Android header
+          mangled the badge rendering on some OEM skins). */}
+      <View
+        className="flex-row items-center justify-between px-5 pb-1"
+        style={{ paddingTop: insets.top + 10 }}
+      >
+        <Wordmark size={22} />
+        <View className="flex-row items-center gap-5">
+          <Pressable
+            onPress={() => router.push('/notifications')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+            }
+            className="h-10 w-10 items-center justify-center rounded-full bg-depth"
+          >
+            <Ionicons name="notifications-outline" size={20} color={colors.mist} />
+            {unreadCount > 0 ? (
+              <View
+                className="absolute items-center justify-center bg-koi"
+                style={{
+                  top: 1,
+                  right: 1,
+                  height: 16,
+                  minWidth: 16,
+                  paddingHorizontal: 3,
+                  borderRadius: 8,
+                  borderWidth: 2,
+                  borderColor: colors.abyss,
+                }}
               >
-                <Ionicons name="notifications-outline" size={21} color={colors.mist} />
-                {unreadCount > 0 ? (
-                  <View className="absolute -right-1.5 -top-1 min-w-[16px] items-center rounded-full bg-koi px-1">
-                    <Text className="font-displaymed text-[10px] leading-4 text-abyss">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-              <Pressable
-                onPress={() => void logout()}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={`Log out ${user?.username ?? ''}`}
-                className="flex-row items-center gap-2"
-              >
-                <Text className="font-displaymed text-xs text-mist">{user?.username}</Text>
-                <Ionicons name="log-out-outline" size={20} color={colors.mist} />
-              </Pressable>
-            </View>
-          ),
-        }}
-      />
+                <Text
+                  className="font-displaymed text-abyss"
+                  style={{ fontSize: 9, lineHeight: 10 }}
+                >
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+          <Pressable
+            onPress={() => void logout()}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={`Log out ${user?.username ?? ''}`}
+            className="flex-row items-center gap-2"
+          >
+            <Text className="font-displaymed text-xs text-mist">{user?.username}</Text>
+            <Ionicons name="log-out-outline" size={20} color={colors.mist} />
+          </Pressable>
+        </View>
+      </View>
 
       <View className="px-5 pb-3 pt-2">
         <View className="h-12 flex-row items-center gap-2.5 rounded-full border border-foam/10 bg-depth px-4">

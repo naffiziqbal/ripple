@@ -1,6 +1,6 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, ErrorBanner, Field, Wordmark } from '../../components/ui';
 import { useAuth } from '../../context/auth-context';
@@ -41,10 +41,7 @@ export default function SignupScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-abyss"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView className="flex-1 bg-abyss" behavior="padding">
       <ScrollView
         contentContainerClassName="flex-grow justify-center px-7 py-12"
         style={{ paddingTop: insets.top }}

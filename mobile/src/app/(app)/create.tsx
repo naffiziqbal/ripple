@@ -1,13 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Pressable, Text, TextInput, View } from 'react-native';
+import { useHeaderOffset } from '../../lib/layout';
 import { ErrorBanner } from '../../components/ui';
 import { useCreatePost } from '../../hooks/use-posts';
 import { colors } from '../../lib/theme';
@@ -17,6 +11,7 @@ const MAX_LENGTH = 500;
 export default function CreatePostScreen() {
   const router = useRouter();
   const createPost = useCreatePost();
+  const headerHeight = useHeaderOffset();
   const [content, setContent] = useState('');
 
   const remaining = MAX_LENGTH - content.length;
@@ -32,7 +27,8 @@ export default function CreatePostScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-abyss"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}
     >
       <Stack.Screen
         options={{
