@@ -1,3 +1,5 @@
+![Ripple](mobile/assets/images/brand-banner.png)
+
 # 🌊 Ripple — Mini Social Feed
 
 A lightweight social app: post short text updates, scroll a shared feed, like and comment, and get push notifications (Firebase Cloud Messaging) when someone interacts with your posts.
