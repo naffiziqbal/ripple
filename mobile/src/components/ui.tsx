@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,6 +8,41 @@ import {
   type PressableProps,
   type TextInputProps,
 } from 'react-native';
+import { colors } from '../lib/theme';
+
+/** Concentric rings — the brand mark. A stone just hit the water. */
+export function RippleMark({ size = 64 }: { size?: number }) {
+  const ring = (scale: number, opacity: number, key: string) => (
+    <View
+      key={key}
+      className="absolute rounded-full border border-glint"
+      style={{
+        width: size * scale,
+        height: size * scale,
+        opacity,
+      }}
+    />
+  );
+  return (
+    <View className="items-center justify-center" style={{ width: size * 2, height: size * 2 }}>
+      {ring(2, 0.14, 'outer')}
+      {ring(1.45, 0.3, 'mid')}
+      {ring(0.95, 0.55, 'inner')}
+      <View
+        className="rounded-full bg-glint"
+        style={{ width: size * 0.16, height: size * 0.16 }}
+      />
+    </View>
+  );
+}
+
+export function Wordmark({ size = 34 }: { size?: number }) {
+  return (
+    <Text className="font-displaybold text-foam" style={{ fontSize: size, letterSpacing: -1 }}>
+      ripple
+    </Text>
+  );
+}
 
 interface ButtonProps extends Omit<PressableProps, 'children'> {
   title: string;
@@ -23,15 +58,21 @@ export function Button({ title, loading, variant = 'primary', disabled, ...rest 
       disabled={disabled || loading}
       className={
         isPrimary
-          ? `h-12 items-center justify-center rounded-xl bg-brand active:bg-brand-dark ${disabled || loading ? 'opacity-50' : ''}`
-          : 'h-12 items-center justify-center rounded-xl active:opacity-60'
+          ? `h-[52px] items-center justify-center rounded-full bg-koi active:bg-koi-deep ${
+              disabled || loading ? 'opacity-40' : ''
+            }`
+          : 'h-[52px] items-center justify-center rounded-full border border-foam/15 active:bg-foam/5'
       }
       {...rest}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? '#fff' : '#0EA5E9'} />
+        <ActivityIndicator color={isPrimary ? colors.abyss : colors.foam} />
       ) : (
-        <Text className={isPrimary ? 'text-base font-semibold text-white' : 'text-base font-semibold text-brand'}>
+        <Text
+          className={
+            isPrimary ? 'font-display text-base text-abyss' : 'font-display text-base text-foam'
+          }
+        >
           {title}
         </Text>
       )}
@@ -45,21 +86,33 @@ interface FieldProps extends TextInputProps {
 }
 
 export const Field = forwardRef<TextInput, FieldProps>(function Field(
-  { label, error, className, ...rest },
+  { label, error, className, onFocus, onBlur, ...rest },
   ref
 ) {
+  const [focused, setFocused] = useState(false);
+  const borderClass = error ? 'border-koi/60' : focused ? 'border-glint/60' : 'border-foam/10';
   return (
-    <View className="gap-1.5">
-      {label ? <Text className="text-sm font-medium text-ink-soft">{label}</Text> : null}
+    <View className="gap-2">
+      {label ? (
+        <Text className="font-displaymed text-xs uppercase tracking-[2px] text-mist">{label}</Text>
+      ) : null}
       <TextInput
         ref={ref}
-        placeholderTextColor="#94A3B8"
-        className={`min-h-12 rounded-xl border bg-surface px-4 py-3 text-base text-ink ${
-          error ? 'border-red-400' : 'border-slate-200'
-        } ${className ?? ''}`}
+        placeholderTextColor="rgba(126,153,149,0.6)"
+        selectionColor={colors.koi}
+        keyboardAppearance="dark"
+        className={`min-h-[52px] rounded-2xl border bg-depth px-4 py-3.5 font-body text-base text-foam ${borderClass} ${className ?? ''}`}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
         {...rest}
       />
-      {error ? <Text className="text-sm text-red-500">{error}</Text> : null}
+      {error ? <Text className="font-body text-sm text-koi">{error}</Text> : null}
     </View>
   );
 });
@@ -67,17 +120,19 @@ export const Field = forwardRef<TextInput, FieldProps>(function Field(
 export function ErrorBanner({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <View className="rounded-xl bg-red-50 px-4 py-3">
-      <Text className="text-sm text-red-600">{message}</Text>
+    <View className="rounded-2xl border border-koi/25 bg-koi/10 px-4 py-3">
+      <Text className="font-body text-sm text-koi">{message}</Text>
     </View>
   );
 }
 
 export function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <View className="items-center gap-1 px-8 py-16">
-      <Text className="text-lg font-semibold text-ink">{title}</Text>
-      {subtitle ? <Text className="text-center text-sm text-ink-faint">{subtitle}</Text> : null}
+    <View className="items-center gap-2 px-8 py-16">
+      <Text className="font-display text-lg text-foam">{title}</Text>
+      {subtitle ? (
+        <Text className="text-center font-body text-sm leading-5 text-mist">{subtitle}</Text>
+      ) : null}
     </View>
   );
 }

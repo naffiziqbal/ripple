@@ -1,14 +1,8 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, ErrorBanner, Field } from '../../components/ui';
+import { Button, ErrorBanner, Field, RippleMark, Wordmark } from '../../components/ui';
 import { useAuth } from '../../context/auth-context';
 
 export default function LoginScreen() {
@@ -36,21 +30,23 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-surface-muted"
+      className="flex-1 bg-abyss"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerClassName="flex-grow justify-center px-6 py-10"
+        contentContainerClassName="flex-grow justify-center px-7 py-12"
         style={{ paddingTop: insets.top }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="mb-10 items-center gap-2">
-          <Text className="text-5xl">🌊</Text>
-          <Text className="text-3xl font-bold text-ink">Ripple</Text>
-          <Text className="text-base text-ink-faint">Small posts, big waves.</Text>
+        <View className="mb-12 items-center">
+          <RippleMark size={56} />
+          <View className="-mt-6 items-center gap-2">
+            <Wordmark />
+            <Text className="font-body text-base text-mist">Say it small. Watch it spread.</Text>
+          </View>
         </View>
 
-        <View className="gap-4 rounded-3xl bg-surface p-6 shadow-sm shadow-slate-200">
+        <View className="gap-5">
           <ErrorBanner message={error} />
           <Field
             label="Username"
@@ -75,10 +71,10 @@ export default function LoginScreen() {
           <Button title="Log in" onPress={handleSubmit} loading={submitting} disabled={!canSubmit} />
         </View>
 
-        <View className="mt-6 flex-row justify-center gap-1">
-          <Text className="text-ink-soft">New to Ripple?</Text>
-          <Link href="/signup" className="font-semibold text-brand">
-            Create an account
+        <View className="mt-8 flex-row justify-center gap-1.5">
+          <Text className="font-body text-mist">New here?</Text>
+          <Link href="/signup">
+            <Text className="font-display text-glint">Create an account</Text>
           </Link>
         </View>
       </ScrollView>

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -10,9 +11,10 @@ import {
   View,
 } from 'react-native';
 import { PostCard } from '../../components/post-card';
-import { EmptyState } from '../../components/ui';
+import { EmptyState, Wordmark } from '../../components/ui';
 import { useAuth } from '../../context/auth-context';
 import { useFeed, useToggleLike } from '../../hooks/use-posts';
+import { colors } from '../../lib/theme';
 import type { Post } from '../../lib/types';
 
 export default function FeedScreen() {
@@ -33,10 +35,7 @@ export default function FeedScreen() {
   const feed = useFeed(filter);
   const toggleLike = useToggleLike();
 
-  const posts = useMemo(
-    () => feed.data?.pages.flatMap((page) => page.items) ?? [],
-    [feed.data]
-  );
+  const posts = useMemo(() => feed.data?.pages.flatMap((page) => page.items) ?? [], [feed.data]);
 
   function applyFilter() {
     const value = filterInput.trim().replace(/^@/, '');
@@ -53,56 +52,64 @@ export default function FeedScreen() {
   }
 
   return (
-    <View className="flex-1 bg-surface-muted">
+    <View className="flex-1 bg-abyss">
       <Stack.Screen
         options={{
+          headerTitle: () => <Wordmark size={22} />,
           headerRight: () => (
-            <Pressable onPress={() => void logout()} hitSlop={8} accessibilityRole="button">
-              <Text className="text-sm font-semibold text-ink-faint">
-                @{user?.username} · Log out
-              </Text>
+            <Pressable
+              onPress={() => void logout()}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={`Log out ${user?.username ?? ''}`}
+              className="flex-row items-center gap-2"
+            >
+              <Text className="font-displaymed text-xs text-mist">{user?.username}</Text>
+              <Ionicons name="log-out-outline" size={20} color={colors.mist} />
             </Pressable>
           ),
         }}
       />
 
-      <View className="flex-row items-center gap-2 px-4 pb-2 pt-3">
-        <TextInput
-          value={filterInput}
-          onChangeText={setFilterInput}
-          onSubmitEditing={applyFilter}
-          placeholder="Filter by username…"
-          placeholderTextColor="#94A3B8"
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          className="h-11 flex-1 rounded-xl border border-slate-200 bg-surface px-4 text-base text-ink"
-        />
+      <View className="px-5 pb-3 pt-2">
+        <View className="h-12 flex-row items-center gap-2.5 rounded-full border border-foam/10 bg-depth px-4">
+          <Ionicons name="search" size={16} color={colors.mist} />
+          <TextInput
+            value={filterInput}
+            onChangeText={setFilterInput}
+            onSubmitEditing={applyFilter}
+            placeholder="Filter by username"
+            placeholderTextColor="rgba(126,153,149,0.6)"
+            selectionColor={colors.koi}
+            keyboardAppearance="dark"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            className="flex-1 font-body text-[15px] text-foam"
+          />
+          {filterInput.length > 0 || filter ? (
+            <Pressable onPress={clearFilter} hitSlop={10} accessibilityLabel="Clear filter">
+              <Ionicons name="close-circle" size={18} color={colors.mist} />
+            </Pressable>
+          ) : null}
+        </View>
         {filter ? (
-          <Pressable
-            onPress={clearFilter}
-            className="h-11 items-center justify-center rounded-xl bg-slate-200 px-4 active:opacity-70"
-          >
-            <Text className="font-semibold text-ink-soft">Clear</Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            onPress={applyFilter}
-            className="h-11 items-center justify-center rounded-xl bg-brand px-4 active:bg-brand-dark"
-          >
-            <Text className="font-semibold text-white">Filter</Text>
-          </Pressable>
-        )}
+          <Text className="mt-2 px-1 font-displaymed text-xs text-glint">
+            Showing thoughts from {filter}
+          </Text>
+        ) : null}
       </View>
 
       {feed.isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#0EA5E9" />
+          <ActivityIndicator size="large" color={colors.glint} />
         </View>
       ) : feed.isError ? (
         <EmptyState
-          title="Couldn't load the feed"
-          subtitle={feed.error instanceof Error ? feed.error.message : 'Please try again.'}
+          title="The feed didn't load"
+          subtitle={
+            feed.error instanceof Error ? feed.error.message : 'Check your connection and retry.'
+          }
         />
       ) : (
         <FlatList
@@ -119,12 +126,14 @@ export default function FeedScreen() {
               }}
             />
           )}
-          contentContainerClassName="gap-3 p-4 pb-28"
+          contentContainerClassName="gap-3.5 px-5 pb-32 pt-1"
           refreshControl={
             <RefreshControl
               refreshing={feed.isRefetching && !feed.isFetchingNextPage}
               onRefresh={() => void feed.refetch()}
-              tintColor="#0EA5E9"
+              tintColor={colors.glint}
+              colors={[colors.glint]}
+              progressBackgroundColor={colors.depth}
             />
           }
           onEndReached={() => {
@@ -135,13 +144,15 @@ export default function FeedScreen() {
           onEndReachedThreshold={0.4}
           ListEmptyComponent={
             <EmptyState
-              title={filter ? `No posts by @${filter}` : 'No posts yet'}
-              subtitle={filter ? 'Try another username.' : 'Be the first to make a ripple!'}
+              title={filter ? `Nothing from ${filter} yet` : 'Still water'}
+              subtitle={
+                filter ? 'Try another username.' : 'Drop the first thought and watch it spread.'
+              }
             />
           }
           ListFooterComponent={
             feed.isFetchingNextPage ? (
-              <ActivityIndicator className="py-4" color="#0EA5E9" />
+              <ActivityIndicator className="py-4" color={colors.glint} />
             ) : null
           }
         />
@@ -149,11 +160,18 @@ export default function FeedScreen() {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Create post"
+        accessibilityLabel="New thought"
         onPress={() => router.push('/create')}
-        className="absolute bottom-8 right-6 h-14 w-14 items-center justify-center rounded-full bg-brand shadow-lg shadow-sky-300 active:bg-brand-dark"
+        className="absolute bottom-9 right-6 h-16 w-16 items-center justify-center rounded-full bg-koi active:bg-koi-deep"
+        style={{
+          shadowColor: colors.koi,
+          shadowOpacity: 0.45,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 10,
+        }}
       >
-        <Text className="text-3xl leading-9 text-white">+</Text>
+        <Ionicons name="add" size={30} color={colors.abyss} />
       </Pressable>
     </View>
   );

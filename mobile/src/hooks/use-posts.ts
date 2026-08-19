@@ -24,6 +24,10 @@ export function useFeed(username?: string) {
       api.getFeed({ page: pageParam, limit: PAGE_SIZE, ...(username ? { username } : {}) }),
     initialPageParam: 1,
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    // Keep the shared feed fresh: other users' posts/likes/comments show up
+    // within seconds without a manual pull-to-refresh.
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 }
 

@@ -1,14 +1,8 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, ErrorBanner, Field } from '../../components/ui';
+import { Button, ErrorBanner, Field, Wordmark } from '../../components/ui';
 import { useAuth } from '../../context/auth-context';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
@@ -24,7 +18,7 @@ export default function SignupScreen() {
 
   const usernameError =
     username.length > 0 && !USERNAME_RE.test(username)
-      ? '3-20 characters: letters, numbers, underscore'
+      ? '3–20 characters: letters, numbers, underscore'
       : undefined;
   const passwordError =
     password.length > 0 && password.length < 6 ? 'At least 6 characters' : undefined;
@@ -48,21 +42,21 @@ export default function SignupScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-surface-muted"
+      className="flex-1 bg-abyss"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerClassName="flex-grow justify-center px-6 py-10"
+        contentContainerClassName="flex-grow justify-center px-7 py-12"
         style={{ paddingTop: insets.top }}
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-10 items-center gap-2">
-          <Text className="text-5xl">🌊</Text>
-          <Text className="text-3xl font-bold text-ink">Join Ripple</Text>
-          <Text className="text-base text-ink-faint">It only takes a moment.</Text>
+          <Wordmark size={28} />
+          <Text className="font-display text-xl text-foam">Create your account</Text>
+          <Text className="font-body text-base text-mist">First thought's on you.</Text>
         </View>
 
-        <View className="gap-4 rounded-3xl bg-surface p-6 shadow-sm shadow-slate-200">
+        <View className="gap-5">
           <ErrorBanner message={error} />
           <Field
             label="Username"
@@ -91,13 +85,18 @@ export default function SignupScreen() {
             placeholder="Repeat your password"
             onSubmitEditing={handleSubmit}
           />
-          <Button title="Sign up" onPress={handleSubmit} loading={submitting} disabled={!canSubmit} />
+          <Button
+            title="Sign up"
+            onPress={handleSubmit}
+            loading={submitting}
+            disabled={!canSubmit}
+          />
         </View>
 
-        <View className="mt-6 flex-row justify-center gap-1">
-          <Text className="text-ink-soft">Already have an account?</Text>
-          <Link href="/login" className="font-semibold text-brand">
-            Log in
+        <View className="mt-8 flex-row justify-center gap-1.5">
+          <Text className="font-body text-mist">Already have an account?</Text>
+          <Link href="/login">
+            <Text className="font-display text-glint">Log in</Text>
           </Link>
         </View>
       </ScrollView>

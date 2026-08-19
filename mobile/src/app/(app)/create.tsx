@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { ErrorBanner } from '../../components/ui';
 import { useCreatePost } from '../../hooks/use-posts';
+import { colors } from '../../lib/theme';
 
 const MAX_LENGTH = 500;
 
@@ -30,7 +31,7 @@ export default function CreatePostScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-surface"
+      className="flex-1 bg-abyss"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Stack.Screen
@@ -40,9 +41,9 @@ export default function CreatePostScreen() {
               onPress={handlePost}
               disabled={!canPost}
               accessibilityRole="button"
-              className={`rounded-full bg-brand px-4 py-1.5 ${canPost ? '' : 'opacity-40'}`}
+              className={`rounded-full bg-koi px-5 py-2 ${canPost ? 'active:bg-koi-deep' : 'opacity-40'}`}
             >
-              <Text className="font-semibold text-white">
+              <Text className="font-display text-sm text-abyss">
                 {createPost.isPending ? 'Posting…' : 'Post'}
               </Text>
             </Pressable>
@@ -50,28 +51,34 @@ export default function CreatePostScreen() {
         }}
       />
 
-      <View className="flex-1 gap-3 p-4">
+      <View className="flex-1 gap-4 p-5">
         <ErrorBanner
           message={
             createPost.isError
               ? createPost.error instanceof Error
                 ? createPost.error.message
-                : 'Failed to publish'
+                : 'Post failed to publish'
               : null
           }
         />
         <TextInput
           value={content}
           onChangeText={setContent}
-          placeholder="What's making waves?"
-          placeholderTextColor="#94A3B8"
+          placeholder="What's on your mind?"
+          placeholderTextColor="rgba(126,153,149,0.6)"
+          selectionColor={colors.koi}
+          keyboardAppearance="dark"
           multiline
           autoFocus
           maxLength={MAX_LENGTH + 50}
           textAlignVertical="top"
-          className="flex-1 text-lg leading-7 text-ink"
+          className="flex-1 font-body text-xl leading-8 text-foam"
         />
-        <Text className={`text-right text-sm ${remaining < 0 ? 'text-red-500' : 'text-ink-faint'}`}>
+        <Text
+          className={`text-right font-displaymed text-sm ${
+            remaining < 0 ? 'text-koi' : remaining < 50 ? 'text-glint' : 'text-mist'
+          }`}
+        >
           {remaining}
         </Text>
       </View>

@@ -1,10 +1,20 @@
 import '../global.css';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  AtkinsonHyperlegible_400Regular,
+  AtkinsonHyperlegible_700Bold,
+} from '@expo-google-fonts/atkinson-hyperlegible';
+import { Sora_500Medium, Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View } from 'react-native';
+import { useEffect } from 'react';
+import { AppState, Platform, View } from 'react-native';
 import { AuthProvider, useAuth } from '../context/auth-context';
+
+void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,15 +29,12 @@ function RootNavigator() {
   const { user, isRestoring } = useAuth();
 
   if (isRestoring) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface-muted">
-        <ActivityIndicator size="large" color="#0EA5E9" />
-      </View>
-    );
+    // The native splash is still covering the app at this point.
+    return <View className="flex-1 bg-abyss" />;
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#081112' } }}>
       <Stack.Protected guard={user !== null}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
@@ -39,10 +46,35 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // Refetch stale queries whenever the app returns to the foreground.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const subscription = AppState.addEventListener('change', (status) => {
+      focusManager.setFocused(status === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const [fontsLoaded] = useFonts({
+    Sora_500Medium,
+    Sora_600SemiBold,
+    Sora_700Bold,
+    AtkinsonHyperlegible_400Regular,
+    AtkinsonHyperlegible_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
         <RootNavigator />
       </AuthProvider>
     </QueryClientProvider>
