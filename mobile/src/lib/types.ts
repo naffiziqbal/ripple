@@ -35,10 +35,31 @@ export interface Paginated<T> {
 
 export interface AuthResponse {
   token: string;
+  refreshToken: string;
   user: User;
 }
 
 export interface LikeResponse {
   liked: boolean;
   likeCount: number;
+}
+
+export interface AppNotification {
+  id: number;
+  type: 'like' | 'comment';
+  postId: number;
+  postPreview: string;
+  actor: { id: number; username: string };
+  read: boolean;
+  createdAt: string;
+}
+
+export type NotificationsPage = Paginated<AppNotification> & { unreadCount: number };
+
+/** Server → client realtime messages over /realtime. */
+export interface RealtimeMessage {
+  event: 'post:new' | 'post:deleted' | 'post:liked' | 'comment:new' | 'notification:new';
+  postId?: number;
+  likeCount?: number;
+  recipientId?: number;
 }

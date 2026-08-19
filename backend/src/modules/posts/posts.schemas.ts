@@ -16,6 +16,11 @@ export const createCommentSchema = z.object({
     .max(300, 'Comments are limited to 300 characters'),
 });
 
+export const commentsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+
 export const feedQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(10),

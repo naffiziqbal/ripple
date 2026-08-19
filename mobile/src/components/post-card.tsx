@@ -10,6 +10,8 @@ interface PostCardProps {
   onToggleLike: (post: Post) => void;
   onOpenComments: (post: Post) => void;
   onPressAuthor?: (username: string) => void;
+  /** Provided only for the viewer's own posts; renders the delete control. */
+  onDelete?: (post: Post) => void;
 }
 
 export function Avatar({ username, size = 'md' }: { username: string; size?: 'sm' | 'md' }) {
@@ -25,7 +27,13 @@ export function Avatar({ username, size = 'md' }: { username: string; size?: 'sm
   );
 }
 
-export function PostCard({ post, onToggleLike, onOpenComments, onPressAuthor }: PostCardProps) {
+export function PostCard({
+  post,
+  onToggleLike,
+  onOpenComments,
+  onPressAuthor,
+  onDelete,
+}: PostCardProps) {
   return (
     <View className="gap-4 rounded-3xl border border-foam/5 bg-depth p-5">
       <View className="flex-row items-center gap-3">
@@ -38,6 +46,17 @@ export function PostCard({ post, onToggleLike, onOpenComments, onPressAuthor }: 
           </Pressable>
           <Text className="font-displaymed text-xs text-mist">· {timeAgo(post.createdAt)}</Text>
         </View>
+        {onDelete ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Delete post"
+            onPress={() => onDelete(post)}
+            hitSlop={10}
+            className="active:opacity-60"
+          >
+            <Ionicons name="trash-outline" size={17} color={colors.mist} />
+          </Pressable>
+        ) : null}
       </View>
 
       <Text className="font-body text-[17px] leading-[26px] text-foam">{post.content}</Text>

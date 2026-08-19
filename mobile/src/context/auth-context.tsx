@@ -9,19 +9,20 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api, setTokenProvider } from '../lib/api';
+import { api, configureApiAuth, type SessionTokens } from '../lib/api';
 import { registerForPushNotifications } from '../lib/notifications';
 import type { User } from '../lib/types';
 
 const STORAGE_KEY = 'ripple.session';
 
-interface Session {
-  token: string;
+interface Session extends SessionTokens {
   user: User;
 }
 
 interface AuthContextValue {
   user: User | null;
+  /** Current short-lived access token (rotates); used by the realtime socket. */
+  accessToken: string | null;
   /** True while the persisted session is being restored on app launch. */
   isRestoring: boolean;
   login: (username: string, password: string) => Promise<void>;
@@ -37,15 +38,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<Session | null>(null);
   sessionRef.current = session;
 
-  // The API client reads the token through a ref so it is never stale.
-  useEffect(() => {
-    setTokenProvider(() => sessionRef.current?.token ?? null);
+  const clearSession = useCallback(() => {
+    setSession(null);
+    sessionRef.current = null;
+    void AsyncStorage.removeItem(STORAGE_KEY);
   }, []);
+
+  // The API client reads tokens through a ref (never stale), persists rotated
+  // pairs, and force-logs-out when the refresh token stops working.
+  useEffect(() => {
+    configureApiAuth({
+      getSession: () => sessionRef.current,
+      onSessionRefreshed: (tokens) => {
+        const current = sessionRef.current;
+        if (!current) return;
+        const next = { ...current, ...tokens };
+        sessionRef.current = next;
+        setSession(next);
+        void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      },
+      onSessionExpired: clearSession,
+    });
+  }, [clearSession]);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
-        if (raw) setSession(JSON.parse(raw) as Session);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Session;
+        // Sessions persisted by pre-refresh-token versions lack refreshToken;
+        // treat them as logged out rather than half-working.
+        if (parsed.refreshToken) {
+          setSession(parsed);
+        } else {
+          void AsyncStorage.removeItem(STORAGE_KEY);
+        }
       })
       .catch(() => AsyncStorage.removeItem(STORAGE_KEY))
       .finally(() => setIsRestoring(false));
@@ -61,25 +88,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (username: string, password: string) => {
-      await persistSession(await api.login(username, password));
+      const auth = await api.login(username, password);
+      await persistSession({
+        token: auth.token,
+        refreshToken: auth.refreshToken,
+        user: auth.user,
+      });
     },
     [persistSession]
   );
 
   const signup = useCallback(
     async (username: string, password: string) => {
-      await persistSession(await api.signup(username, password));
+      const auth = await api.signup(username, password);
+      await persistSession({
+        token: auth.token,
+        refreshToken: auth.refreshToken,
+        user: auth.user,
+      });
     },
     [persistSession]
   );
 
   const logout = useCallback(async () => {
-    setSession(null);
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  }, []);
+    const refreshToken = sessionRef.current?.refreshToken;
+    clearSession();
+    if (refreshToken) {
+      await api.logout(refreshToken); // best-effort server-side revocation
+    }
+  }, [clearSession]);
 
   const value = useMemo(
-    () => ({ user: session?.user ?? null, isRestoring, login, signup, logout }),
+    () => ({
+      user: session?.user ?? null,
+      accessToken: session?.token ?? null,
+      isRestoring,
+      login,
+      signup,
+      logout,
+    }),
     [session, isRestoring, login, signup, logout]
   );
 

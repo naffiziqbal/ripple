@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState, Platform, View } from 'react-native';
+import { ToastProvider } from '../components/toast';
 import { AuthProvider, useAuth } from '../context/auth-context';
 
 void SplashScreen.preventAutoHideAsync();
@@ -74,8 +75,10 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <StatusBar style="light" />
-        <RootNavigator />
+        <ToastProvider>
+          <StatusBar style="light" />
+          <RootNavigator />
+        </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

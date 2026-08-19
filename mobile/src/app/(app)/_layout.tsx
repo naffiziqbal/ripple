@@ -1,12 +1,18 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { useAuth } from '../../context/auth-context';
+import { useRealtime } from '../../hooks/use-realtime';
 import { getNotificationsModule } from '../../lib/notifications';
 import { colors, fonts } from '../../lib/theme';
 
 export default function AppLayout() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { accessToken } = useAuth();
+
+  // Live feed/badge updates over WebSocket while signed in.
+  useRealtime(accessToken);
 
   // Push notifications (dev builds only — Expo Go and web can't receive them):
   // a push arriving means someone interacted, so refresh server state right away;
@@ -44,6 +50,7 @@ export default function AppLayout() {
       <Stack.Screen name="index" options={{ title: '' }} />
       <Stack.Screen name="create" options={{ title: 'New thought', presentation: 'modal' }} />
       <Stack.Screen name="post/[id]" options={{ title: 'Thread' }} />
+      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
     </Stack>
   );
 }

@@ -129,17 +129,31 @@ describe('POST /posts/:id/comment', () => {
     expect(feed.body.items[0].recentComments[0].content).toBe('Nice post!');
   });
 
-  it('lists full comments oldest-first', async () => {
+  it('lists comments oldest-first with pagination', async () => {
     const postId = await createPost(alice.token, 'discuss');
-    await request(app).post(`/posts/${postId}/comment`).set(auth(bob.token)).send({ content: 'first' });
-    await request(app).post(`/posts/${postId}/comment`).set(auth(alice.token)).send({ content: 'second' });
+    for (let i = 1; i <= 5; i++) {
+      await request(app)
+        .post(`/posts/${postId}/comment`)
+        .set(auth(i % 2 === 0 ? alice.token : bob.token))
+        .send({ content: `comment ${i}` });
+    }
 
-    const res = await request(app).get(`/posts/${postId}/comments`).set(auth(bob.token));
-    expect(res.status).toBe(200);
-    expect(res.body.comments.map((c: { content: string }) => c.content)).toEqual([
-      'first',
-      'second',
+    const page1 = await request(app)
+      .get(`/posts/${postId}/comments?page=1&limit=2`)
+      .set(auth(bob.token));
+    expect(page1.status).toBe(200);
+    expect(page1.body.items.map((c: { content: string }) => c.content)).toEqual([
+      'comment 1',
+      'comment 2',
     ]);
+    expect(page1.body.total).toBe(5);
+    expect(page1.body.hasMore).toBe(true);
+
+    const page3 = await request(app)
+      .get(`/posts/${postId}/comments?page=3&limit=2`)
+      .set(auth(bob.token));
+    expect(page3.body.items).toHaveLength(1);
+    expect(page3.body.hasMore).toBe(false);
   });
 
   it('rejects empty comments', async () => {
@@ -149,5 +163,30 @@ describe('POST /posts/:id/comment', () => {
       .set(auth(bob.token))
       .send({ content: '' });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('DELETE /posts/:id', () => {
+  it('lets the owner delete their post', async () => {
+    const postId = await createPost(alice.token, 'delete me');
+    const res = await request(app).delete(`/posts/${postId}`).set(auth(alice.token));
+    expect(res.status).toBe(200);
+
+    const feed = await request(app).get('/posts').set(auth(alice.token));
+    expect(feed.body.total).toBe(0);
+  });
+
+  it('forbids deleting someone else’s post', async () => {
+    const postId = await createPost(alice.token, 'mine');
+    const res = await request(app).delete(`/posts/${postId}`).set(auth(bob.token));
+    expect(res.status).toBe(403);
+
+    const feed = await request(app).get('/posts').set(auth(bob.token));
+    expect(feed.body.total).toBe(1);
+  });
+
+  it('404s on a missing post', async () => {
+    const res = await request(app).delete('/posts/9999').set(auth(alice.token));
+    expect(res.status).toBe(404);
   });
 });

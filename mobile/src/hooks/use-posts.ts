@@ -9,12 +9,14 @@ import { api } from '../lib/api';
 import type { Paginated, Post } from '../lib/types';
 
 const PAGE_SIZE = 10;
+const COMMENTS_PAGE_SIZE = 30;
 
-const postKeys = {
+export const postKeys = {
   feeds: ['feed'] as const,
   feed: (username?: string) => ['feed', username?.toLowerCase() ?? 'all'] as const,
   post: (id: number) => ['post', id] as const,
   comments: (id: number) => ['comments', id] as const,
+  notifications: ['notifications'] as const,
 };
 
 export function useFeed(username?: string) {
@@ -24,9 +26,9 @@ export function useFeed(username?: string) {
       api.getFeed({ page: pageParam, limit: PAGE_SIZE, ...(username ? { username } : {}) }),
     initialPageParam: 1,
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
-    // Keep the shared feed fresh: other users' posts/likes/comments show up
-    // within seconds without a manual pull-to-refresh.
-    refetchInterval: 15_000,
+    // Fallback freshness only — the realtime socket invalidates on events;
+    // this catches missed messages while the socket is down.
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
   });
 }
@@ -40,10 +42,11 @@ export function usePost(postId: number) {
 }
 
 export function useComments(postId: number) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: postKeys.comments(postId),
-    queryFn: () => api.getComments(postId),
-    select: (data) => data.comments,
+    queryFn: ({ pageParam }) => api.getComments(postId, pageParam, COMMENTS_PAGE_SIZE),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
   });
 }
 
@@ -52,6 +55,33 @@ export function useCreatePost() {
   return useMutation({
     mutationFn: (content: string) => api.createPost(content),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: postKeys.feeds }),
+  });
+}
+
+export function useDeletePost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (postId: number) => api.deletePost(postId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: postKeys.feeds }),
+  });
+}
+
+export function useNotifications() {
+  return useInfiniteQuery({
+    queryKey: postKeys.notifications,
+    queryFn: ({ pageParam }) => api.getNotifications(pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useMarkNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.markNotificationsRead(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: postKeys.notifications }),
   });
 }
 

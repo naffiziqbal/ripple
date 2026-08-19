@@ -10,7 +10,8 @@ const envSchema = z.object({
     .url()
     .default('postgres://ripple:ripple@localhost:5433/ripple'),
   JWT_SECRET: z.string().min(16).default('dev-only-secret-change-in-production'),
-  JWT_EXPIRES_IN: z.string().default('7d'),
+  JWT_EXPIRES_IN: z.string().default('15m'),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   FIREBASE_SERVICE_ACCOUNT: z
     .string()
     .default(path.join(__dirname, '..', 'firebase-service-account.json')),

@@ -35,8 +35,29 @@ export async function migrate(pool: Pool): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      revoked_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      actor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL CHECK (type IN ('like', 'comment')),
+      post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+      read BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
     CREATE INDEX IF NOT EXISTS idx_posts_created ON posts (created_at DESC, id DESC);
     CREATE INDEX IF NOT EXISTS idx_comments_post ON comments (post_id);
     CREATE INDEX IF NOT EXISTS idx_likes_post ON likes (post_id);
+    CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens (user_id);
+    CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications (recipient_id, read, created_at DESC);
   `);
 }

@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -13,11 +14,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, PostCard } from '../../../components/post-card';
+import { useToast } from '../../../components/toast';
 import { EmptyState } from '../../../components/ui';
-import { useAddComment, useComments, usePost, useToggleLike } from '../../../hooks/use-posts';
+import { useAuth } from '../../../context/auth-context';
+import {
+  useAddComment,
+  useComments,
+  useDeletePost,
+  usePost,
+  useToggleLike,
+} from '../../../hooks/use-posts';
 import { colors } from '../../../lib/theme';
 import { timeAgo } from '../../../lib/time';
-import type { Comment } from '../../../lib/types';
+import type { Comment, Post } from '../../../lib/types';
 
 function CommentRow({ comment }: { comment: Comment }) {
   return (
@@ -39,18 +48,49 @@ export default function PostDetailScreen() {
   const postId = Number(id);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const { user } = useAuth();
 
   const post = usePost(postId);
   const comments = useComments(postId);
   const toggleLike = useToggleLike();
+  const deletePost = useDeletePost();
   const addComment = useAddComment(postId);
   const [draft, setDraft] = useState('');
+
+  const commentItems = useMemo(
+    () => comments.data?.pages.flatMap((page) => page.items) ?? [],
+    [comments.data]
+  );
 
   const canSend = draft.trim().length > 0 && !addComment.isPending;
 
   function handleSend() {
     if (!canSend) return;
-    addComment.mutate(draft.trim(), { onSuccess: () => setDraft('') });
+    addComment.mutate(draft.trim(), {
+      onSuccess: () => setDraft(''),
+      onError: (err) =>
+        toast.show(err instanceof Error ? err.message : 'Comment failed to send', 'error'),
+    });
+  }
+
+  function confirmDelete(target: Post) {
+    Alert.alert('Delete this thought?', 'It disappears for everyone.', [
+      { text: 'Keep it', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () =>
+          deletePost.mutate(target.id, {
+            onSuccess: () => {
+              toast.show('Post deleted');
+              router.back();
+            },
+            onError: (err) =>
+              toast.show(err instanceof Error ? err.message : 'Delete failed', 'error'),
+          }),
+      },
+    ]);
   }
 
   if (post.isLoading) {
@@ -79,7 +119,7 @@ export default function PostDetailScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <FlatList
-        data={comments.data ?? []}
+        data={commentItems}
         keyExtractor={(comment) => String(comment.id)}
         renderItem={({ item }) => <CommentRow comment={item} />}
         contentContainerClassName="gap-3 px-5 py-4"
@@ -90,6 +130,7 @@ export default function PostDetailScreen() {
               onToggleLike={(p) => toggleLike.mutate(p)}
               onOpenComments={() => undefined}
               onPressAuthor={(username) => router.navigate({ pathname: '/', params: { username } })}
+              {...(post.data.author.id === user?.id ? { onDelete: confirmDelete } : {})}
             />
             <Text className="px-1 font-displaymed text-xs uppercase tracking-[2px] text-mist">
               Comments · {post.data.commentCount}
@@ -102,6 +143,22 @@ export default function PostDetailScreen() {
           ) : (
             <EmptyState title="No comments yet" subtitle="Say the first thing." />
           )
+        }
+        ListFooterComponent={
+          comments.hasNextPage ? (
+            <Pressable
+              onPress={() => void comments.fetchNextPage()}
+              disabled={comments.isFetchingNextPage}
+              accessibilityRole="button"
+              className="items-center rounded-2xl border border-foam/10 py-3 active:bg-foam/5"
+            >
+              {comments.isFetchingNextPage ? (
+                <ActivityIndicator color={colors.glint} />
+              ) : (
+                <Text className="font-display text-sm text-glint">Show more comments</Text>
+              )}
+            </Pressable>
+          ) : null
         }
       />
 

@@ -1,7 +1,9 @@
 import { getPool } from '../../db';
 import { ApiError } from '../../lib/errors';
+import { realtimeEvents } from '../../realtime/events';
 import type { AuthUser, CommentDto, Paginated, PostDto, PostRow, UserRow } from '../../types';
 import { findUserById } from '../auth/auth.service';
+import { recordNotification } from '../notifications/notifications.center';
 import { notifyPostCommented, notifyPostLiked } from '../notifications/notifications.service';
 import type { FeedQuery } from './posts.schemas';
 
@@ -160,7 +162,19 @@ export async function createPost(author: AuthUser, content: string): Promise<Pos
     'INSERT INTO posts (user_id, content) VALUES ($1, $2) RETURNING id',
     [author.id, content]
   );
-  return getPost(rows[0]!.id, author);
+  const post = await getPost(rows[0]!.id, author);
+  realtimeEvents.emitEvent('post:new', { postId: post.id });
+  return post;
+}
+
+/** Delete the viewer's own post (likes, comments, notifications cascade). */
+export async function deletePost(postId: number, actor: AuthUser): Promise<void> {
+  const post = await requirePostRow(postId);
+  if (post.user_id !== actor.id) {
+    throw new ApiError(403, 'You can only delete your own posts');
+  }
+  await getPool().query('DELETE FROM posts WHERE id = $1', [postId]);
+  realtimeEvents.emitEvent('post:deleted', { postId });
 }
 
 async function requirePostRow(postId: number): Promise<PostRow> {
@@ -172,15 +186,25 @@ async function requirePostRow(postId: number): Promise<PostRow> {
   return row;
 }
 
-function notifyOwner(
+/**
+ * Record the in-app notification (awaited — part of the request's writes),
+ * then fire the FCM push without blocking the response.
+ */
+async function notifyOwner(
   post: PostRow,
   actor: AuthUser,
-  notify: (owner: UserRow) => Promise<void>
-): void {
+  type: 'like' | 'comment',
+  push: (owner: UserRow) => Promise<void>
+): Promise<void> {
   if (post.user_id === actor.id) return; // no self-notifications
-  // Fire-and-forget: push delivery must never block or fail the API response.
+  await recordNotification({
+    recipientId: post.user_id,
+    actorId: actor.id,
+    type,
+    postId: post.id,
+  });
   void findUserById(post.user_id)
-    .then((owner) => (owner ? notify(owner) : undefined))
+    .then((owner) => (owner ? push(owner) : undefined))
     .catch(() => undefined);
 }
 
@@ -204,7 +228,7 @@ export async function toggleLike(
       'INSERT INTO likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [postId, actor.id]
     );
-    notifyOwner(post, actor, (owner) =>
+    await notifyOwner(post, actor, 'like', (owner) =>
       notifyPostLiked({ recipient: owner, actorUsername: actor.username, postId })
     );
   }
@@ -213,7 +237,9 @@ export async function toggleLike(
     'SELECT COUNT(*)::int AS count FROM likes WHERE post_id = $1',
     [postId]
   );
-  return { liked, likeCount: rows[0]!.count };
+  const likeCount = rows[0]!.count;
+  realtimeEvents.emitEvent('post:liked', { postId, likeCount });
+  return { liked, likeCount };
 }
 
 export async function addComment(
@@ -234,7 +260,7 @@ export async function addComment(
     [postId, actor.id, content]
   );
 
-  notifyOwner(post, actor, (owner) =>
+  await notifyOwner(post, actor, 'comment', (owner) =>
     notifyPostCommented({
       recipient: owner,
       actorUsername: actor.username,
@@ -243,14 +269,31 @@ export async function addComment(
     })
   );
 
+  realtimeEvents.emitEvent('comment:new', { postId });
   return toCommentDto(rows[0]!);
 }
 
-export async function getComments(postId: number): Promise<CommentDto[]> {
+export async function getComments(
+  postId: number,
+  page: number,
+  limit: number
+): Promise<Paginated<CommentDto>> {
   await requirePostRow(postId);
-  const { rows } = await getPool().query<CommentWithAuthorRow>(
-    `${COMMENT_SELECT} WHERE c.post_id = $1 ORDER BY c.created_at ASC, c.id ASC`,
-    [postId]
+  const pool = getPool();
+
+  const total = (
+    await pool.query<{ count: number }>(
+      'SELECT COUNT(*)::int AS count FROM comments WHERE post_id = $1',
+      [postId]
+    )
+  ).rows[0]!.count;
+
+  const { rows } = await pool.query<CommentWithAuthorRow>(
+    `${COMMENT_SELECT} WHERE c.post_id = $1
+     ORDER BY c.created_at ASC, c.id ASC
+     OFFSET $2 LIMIT $3`,
+    [postId, (page - 1) * limit, limit]
   );
-  return rows.map(toCommentDto);
+
+  return { items: rows.map(toCommentDto), page, limit, total, hasMore: page * limit < total };
 }

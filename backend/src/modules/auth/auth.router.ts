@@ -2,7 +2,12 @@ import { Router } from 'express';
 import { ApiError } from '../../lib/errors';
 import { authUser, requireAuth } from '../../middleware/auth';
 import { parseBody } from '../../middleware/validate';
-import { credentialsSchema, deviceTokenSchema, loginSchema } from './auth.schemas';
+import {
+  credentialsSchema,
+  deviceTokenSchema,
+  loginSchema,
+  refreshTokenSchema,
+} from './auth.schemas';
 import * as authService from './auth.service';
 
 export const authRouter = Router();
@@ -17,6 +22,19 @@ authRouter.post('/login', async (req, res) => {
   const credentials = parseBody(loginSchema, req);
   const result = await authService.login(credentials);
   res.json(result);
+});
+
+/** Exchange a valid refresh token for a fresh access + refresh pair. */
+authRouter.post('/refresh', async (req, res) => {
+  const { refreshToken } = parseBody(refreshTokenSchema, req);
+  res.json(await authService.rotateRefreshToken(refreshToken));
+});
+
+/** Revoke the session's refresh token. */
+authRouter.post('/logout', async (req, res) => {
+  const { refreshToken } = parseBody(refreshTokenSchema, req);
+  await authService.revokeRefreshToken(refreshToken);
+  res.json({ ok: true });
 });
 
 authRouter.get('/me', requireAuth, async (req, res) => {

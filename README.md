@@ -26,7 +26,7 @@ npm run dev            # → http://localhost:4000
 - Already running Postgres yourself? Just set `DATABASE_URL` in `.env` and skip Docker.
 - Without a Firebase service account the API runs in **log-only push mode** (notifications are printed to stdout), so everything works locally with zero Firebase setup.
 
-Run the test suite (19 integration tests against a dedicated `ripple_test` database, created automatically):
+Run the test suite (33 integration tests against a dedicated `ripple_test` database, created automatically — covers auth + refresh rotation, feed, likes, comments, notifications, and the realtime WebSocket):
 
 ```bash
 npm test        # vitest + supertest
@@ -65,16 +65,24 @@ Base URL: `http://localhost:4000` — all `/posts` routes require `Authorization
 
 | Method | Route | Description |
 | --- | --- | --- |
-| POST | `/auth/signup` | Create account `{ username, password }` → `{ token, user }` |
-| POST | `/auth/login` | Log in → `{ token, user }` |
+| POST | `/auth/signup` | Create account `{ username, password }` → `{ token, refreshToken, user }` |
+| POST | `/auth/login` | Log in → `{ token, refreshToken, user }` |
+| POST | `/auth/refresh` | Rotate refresh token → new `{ token, refreshToken }` (reuse detection revokes all sessions) |
+| POST | `/auth/logout` | Revoke a refresh token |
 | GET | `/auth/me` | Current user from token |
 | PUT | `/auth/device-token` | Register FCM device token `{ token }` |
 | GET | `/posts?page=1&limit=10&username=alice` | Paginated feed, newest first; optional author filter |
 | POST | `/posts` | Create text post `{ content }` (≤ 500 chars) |
 | GET | `/posts/:id` | Single post with counts + `likedByMe` |
+| DELETE | `/posts/:id` | Delete your own post (403 otherwise) |
 | POST | `/posts/:id/like` | Toggle like → `{ liked, likeCount }` (notifies author) |
 | POST | `/posts/:id/comment` | Add comment `{ content }` (notifies author) |
-| GET | `/posts/:id/comments` | Full comment list, oldest first |
+| GET | `/posts/:id/comments?page&limit` | Paginated comment list, oldest first |
+| GET | `/notifications?page&limit` | Your like/comment history + `unreadCount` |
+| POST | `/notifications/read-all` | Clear the unread badge |
+| WS | `/realtime?token=<jwt>` | Live events: `post:new`, `post:deleted`, `post:liked`, `comment:new`, `notification:new` |
+
+Access tokens are short-lived (15 min); the mobile client transparently rotates the refresh token on 401 (single-flight) and logs out when rotation fails. `/auth/*` credential endpoints are rate-limited (10/min per IP) with a 300/min global limit, behind `helmet` headers.
 
 Feed items include `likeCount`, `commentCount`, `likedByMe`, and a two-comment `recentComments` preview so the feed renders without N+1 requests.
 
@@ -88,7 +96,9 @@ Feed items include `likeCount`, `commentCount`, `likedByMe`, and a two-comment `
 - **Typed error handling**: `ApiError` + a single error middleware; Express 5 forwards async throws natively.
 - **Security details**: bcrypt password hashing, uniform login errors with dummy-hash comparison to avoid username-timing oracles, case-insensitive unique usernames enforced by a functional unique index (no check-then-insert race), JWT config via validated env.
 - **Query craft**: feed counts and `likedByMe` computed in one query; comment previews batched with a `ROW_NUMBER()` window over `ANY($1::int[])` — no N+1; like toggle is a delete-first + `ON CONFLICT DO NOTHING` insert, race-safe without explicit locking.
-- **Push notifications are fire-and-forget** — FCM failure can never fail or slow the originating request, and the service degrades to log-only mode when unconfigured.
+- **Push notifications are fire-and-forget** — FCM failure can never fail or slow the originating request, and the service degrades to log-only mode when unconfigured. Every like/comment also lands as a persistent row in `notifications`, powering the in-app notification center and unread badge.
+- **Realtime**: a `ws` WebSocket endpoint fed by an in-process event bus (`realtime/events.ts`) keeps domain services decoupled from transport; feed events broadcast, notification events target only the recipient. The app falls back to 60s polling if the socket drops.
+- **Auth hardening**: 15-minute access tokens with rotating refresh tokens (sha256-hashed at rest, reuse detection revokes all sessions), rate-limited credential endpoints, `helmet` headers.
 - **Tests are integration-level** (Supertest against the real app + a real Postgres test database, truncated between tests), covering auth, pagination, filtering, like toggling, comments, and authorization failures.
 
 **Mobile**

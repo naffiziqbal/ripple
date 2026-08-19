@@ -4,6 +4,7 @@ import type {
   AuthResponse,
   Comment,
   LikeResponse,
+  NotificationsPage,
   Paginated,
   Post,
 } from './types';
@@ -29,6 +30,11 @@ function resolveBaseUrl(): string {
 
 const API_URL = resolveBaseUrl();
 
+/** ws:// twin of the API base, for the /realtime socket. */
+export function realtimeUrl(token: string): string {
+  return `${API_URL.replace(/^http/, 'ws')}/realtime?token=${encodeURIComponent(token)}`;
+}
+
 class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -40,25 +46,37 @@ class ApiError extends Error {
   }
 }
 
-type TokenProvider = () => string | null;
-
-let getToken: TokenProvider = () => null;
-
-/** Called once by the auth provider so the client can attach the JWT. */
-export function setTokenProvider(provider: TokenProvider): void {
-  getToken = provider;
+export interface SessionTokens {
+  token: string;
+  refreshToken: string;
 }
 
-async function request<T>(
+type SessionProvider = () => SessionTokens | null;
+
+let getSession: SessionProvider = () => null;
+let onSessionRefreshed: (tokens: SessionTokens) => void = () => undefined;
+let onSessionExpired: () => void = () => undefined;
+
+/** Called once by the auth provider so the client can read/renew the session. */
+export function configureApiAuth(handlers: {
+  getSession: SessionProvider;
+  onSessionRefreshed: (tokens: SessionTokens) => void;
+  onSessionExpired: () => void;
+}): void {
+  getSession = handlers.getSession;
+  onSessionRefreshed = handlers.onSessionRefreshed;
+  onSessionExpired = handlers.onSessionExpired;
+}
+
+async function rawRequest<T>(
   path: string,
-  options: { method?: string; body?: unknown } = {}
+  options: { method?: string; body?: unknown; token?: string | null } = {}
 ): Promise<T> {
-  const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     method: options.method ?? 'GET',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
@@ -74,12 +92,59 @@ async function request<T>(
   return payload as T;
 }
 
+/** Single-flight refresh: concurrent 401s share one rotation. */
+let refreshInFlight: Promise<SessionTokens | null> | null = null;
+
+function refreshSession(refreshToken: string): Promise<SessionTokens | null> {
+  refreshInFlight ??= rawRequest<AuthResponse>('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken },
+  })
+    .then((auth) => {
+      const tokens = { token: auth.token, refreshToken: auth.refreshToken };
+      onSessionRefreshed(tokens);
+      return tokens;
+    })
+    .catch(() => {
+      onSessionExpired();
+      return null;
+    })
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
+}
+
+async function request<T>(
+  path: string,
+  options: { method?: string; body?: unknown } = {}
+): Promise<T> {
+  const session = getSession();
+  try {
+    return await rawRequest<T>(path, { ...options, token: session?.token ?? null });
+  } catch (err) {
+    // Access token expired mid-session: rotate the refresh token and retry once.
+    if (err instanceof ApiError && err.status === 401 && session?.refreshToken) {
+      const renewed = await refreshSession(session.refreshToken);
+      if (renewed) {
+        return rawRequest<T>(path, { ...options, token: renewed.token });
+      }
+    }
+    throw err;
+  }
+}
+
 export const api = {
   signup: (username: string, password: string) =>
-    request<AuthResponse>('/auth/signup', { method: 'POST', body: { username, password } }),
+    rawRequest<AuthResponse>('/auth/signup', { method: 'POST', body: { username, password } }),
 
   login: (username: string, password: string) =>
-    request<AuthResponse>('/auth/login', { method: 'POST', body: { username, password } }),
+    rawRequest<AuthResponse>('/auth/login', { method: 'POST', body: { username, password } }),
+
+  logout: (refreshToken: string) =>
+    rawRequest<{ ok: boolean }>('/auth/logout', { method: 'POST', body: { refreshToken } }).catch(
+      () => ({ ok: false })
+    ),
 
   registerDeviceToken: (token: string) =>
     request<{ ok: boolean }>('/auth/device-token', { method: 'PUT', body: { token } }),
@@ -96,6 +161,8 @@ export const api = {
   createPost: (content: string) =>
     request<{ post: Post }>('/posts', { method: 'POST', body: { content } }),
 
+  deletePost: (postId: number) => request<{ ok: boolean }>(`/posts/${postId}`, { method: 'DELETE' }),
+
   getPost: (postId: number) => request<{ post: Post }>(`/posts/${postId}`),
 
   toggleLike: (postId: number) =>
@@ -107,5 +174,12 @@ export const api = {
       body: { content },
     }),
 
-  getComments: (postId: number) => request<{ comments: Comment[] }>(`/posts/${postId}/comments`),
+  getComments: (postId: number, page: number, limit = 30) =>
+    request<Paginated<Comment>>(`/posts/${postId}/comments?page=${page}&limit=${limit}`),
+
+  getNotifications: (page = 1, limit = 20) =>
+    request<NotificationsPage>(`/notifications?page=${page}&limit=${limit}`),
+
+  markNotificationsRead: () =>
+    request<{ ok: boolean }>('/notifications/read-all', { method: 'POST' }),
 };

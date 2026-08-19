@@ -81,6 +81,69 @@ describe('GET /auth/me', () => {
   });
 });
 
+describe('POST /auth/refresh', () => {
+  async function loginPair() {
+    await signupUser(app, 'alice', 'password123');
+    const res = await request(app)
+      .post('/auth/login')
+      .send({ username: 'alice', password: 'password123' });
+    return res.body as { token: string; refreshToken: string };
+  }
+
+  it('rotates a valid refresh token into a new pair', async () => {
+    const session = await loginPair();
+    const res = await request(app)
+      .post('/auth/refresh')
+      .send({ refreshToken: session.refreshToken });
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeTypeOf('string');
+    expect(res.body.refreshToken).toBeTypeOf('string');
+    expect(res.body.refreshToken).not.toBe(session.refreshToken);
+
+    const me = await request(app).get('/auth/me').set(auth(res.body.token));
+    expect(me.status).toBe(200);
+  });
+
+  it('rejects garbage refresh tokens', async () => {
+    const res = await request(app).post('/auth/refresh').send({ refreshToken: 'not-a-token' });
+    expect(res.status).toBe(401);
+  });
+
+  it('detects reuse of a rotated token and revokes all sessions', async () => {
+    const session = await loginPair();
+    const first = await request(app)
+      .post('/auth/refresh')
+      .send({ refreshToken: session.refreshToken });
+    expect(first.status).toBe(200);
+
+    // Replaying the already-rotated token must fail…
+    const replay = await request(app)
+      .post('/auth/refresh')
+      .send({ refreshToken: session.refreshToken });
+    expect(replay.status).toBe(401);
+
+    // …and must also kill the token issued by the successful rotation.
+    const cascade = await request(app)
+      .post('/auth/refresh')
+      .send({ refreshToken: first.body.refreshToken });
+    expect(cascade.status).toBe(401);
+  });
+
+  it('logout revokes the refresh token', async () => {
+    const session = await loginPair();
+    const out = await request(app)
+      .post('/auth/logout')
+      .send({ refreshToken: session.refreshToken });
+    expect(out.status).toBe(200);
+
+    const res = await request(app)
+      .post('/auth/refresh')
+      .send({ refreshToken: session.refreshToken });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('PUT /auth/device-token', () => {
   it('stores the FCM device token', async () => {
     const { token } = await signupUser(app, 'alice');

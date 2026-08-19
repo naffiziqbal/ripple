@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -11,9 +12,15 @@ import {
   View,
 } from 'react-native';
 import { PostCard } from '../../components/post-card';
+import { useToast } from '../../components/toast';
 import { EmptyState, Wordmark } from '../../components/ui';
 import { useAuth } from '../../context/auth-context';
-import { useFeed, useToggleLike } from '../../hooks/use-posts';
+import {
+  useDeletePost,
+  useFeed,
+  useNotifications,
+  useToggleLike,
+} from '../../hooks/use-posts';
 import { colors } from '../../lib/theme';
 import type { Post } from '../../lib/types';
 
@@ -34,8 +41,28 @@ export default function FeedScreen() {
 
   const feed = useFeed(filter);
   const toggleLike = useToggleLike();
+  const deletePost = useDeletePost();
+  const notifications = useNotifications();
+  const toast = useToast();
 
   const posts = useMemo(() => feed.data?.pages.flatMap((page) => page.items) ?? [], [feed.data]);
+  const unreadCount = notifications.data?.pages[0]?.unreadCount ?? 0;
+
+  function confirmDelete(post: Post) {
+    Alert.alert('Delete this thought?', 'It disappears for everyone.', [
+      { text: 'Keep it', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () =>
+          deletePost.mutate(post.id, {
+            onSuccess: () => toast.show('Post deleted'),
+            onError: (err) =>
+              toast.show(err instanceof Error ? err.message : 'Delete failed', 'error'),
+          }),
+      },
+    ]);
+  }
 
   function applyFilter() {
     const value = filterInput.trim().replace(/^@/, '');
@@ -57,16 +84,35 @@ export default function FeedScreen() {
         options={{
           headerTitle: () => <Wordmark size={22} />,
           headerRight: () => (
-            <Pressable
-              onPress={() => void logout()}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={`Log out ${user?.username ?? ''}`}
-              className="flex-row items-center gap-2"
-            >
-              <Text className="font-displaymed text-xs text-mist">{user?.username}</Text>
-              <Ionicons name="log-out-outline" size={20} color={colors.mist} />
-            </Pressable>
+            <View className="flex-row items-center gap-5">
+              <Pressable
+                onPress={() => router.push('/notifications')}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+                }
+              >
+                <Ionicons name="notifications-outline" size={21} color={colors.mist} />
+                {unreadCount > 0 ? (
+                  <View className="absolute -right-1.5 -top-1 min-w-[16px] items-center rounded-full bg-koi px-1">
+                    <Text className="font-displaymed text-[10px] leading-4 text-abyss">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+              <Pressable
+                onPress={() => void logout()}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Log out ${user?.username ?? ''}`}
+                className="flex-row items-center gap-2"
+              >
+                <Text className="font-displaymed text-xs text-mist">{user?.username}</Text>
+                <Ionicons name="log-out-outline" size={20} color={colors.mist} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -124,6 +170,7 @@ export default function FeedScreen() {
                 setFilterInput(username);
                 setFilter(username);
               }}
+              {...(item.author.id === user?.id ? { onDelete: confirmDelete } : {})}
             />
           )}
           contentContainerClassName="gap-3.5 px-5 pb-32 pt-1"

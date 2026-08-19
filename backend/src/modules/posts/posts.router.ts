@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { authUser, requireAuth } from '../../middleware/auth';
 import { parseBody, parseIdParam, parseQuery } from '../../middleware/validate';
-import { createCommentSchema, createPostSchema, feedQuerySchema } from './posts.schemas';
+import {
+  commentsQuerySchema,
+  createCommentSchema,
+  createPostSchema,
+  feedQuerySchema,
+} from './posts.schemas';
 import * as postsService from './posts.service';
 
 export const postsRouter = Router();
@@ -25,6 +30,12 @@ postsRouter.get('/:id', async (req, res) => {
   res.json({ post: await postsService.getPost(parseIdParam(req), authUser(req)) });
 });
 
+/** DELETE /posts/:id — delete your own post. */
+postsRouter.delete('/:id', async (req, res) => {
+  await postsService.deletePost(parseIdParam(req), authUser(req));
+  res.json({ ok: true });
+});
+
 /** POST /posts/:id/like — toggle like/unlike. */
 postsRouter.post('/:id/like', async (req, res) => {
   res.json(await postsService.toggleLike(parseIdParam(req), authUser(req)));
@@ -38,7 +49,8 @@ postsRouter.post('/:id/comment', async (req, res) => {
     .json({ comment: await postsService.addComment(parseIdParam(req), authUser(req), content) });
 });
 
-/** GET /posts/:id/comments — full comment list, oldest first. */
+/** GET /posts/:id/comments — paginated comment list, oldest first. */
 postsRouter.get('/:id/comments', async (req, res) => {
-  res.json({ comments: await postsService.getComments(parseIdParam(req)) });
+  const { page, limit } = parseQuery(commentsQuerySchema, req);
+  res.json(await postsService.getComments(parseIdParam(req), page, limit));
 });
