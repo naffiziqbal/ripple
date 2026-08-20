@@ -120,11 +120,3 @@ Base: `https://api.ripple.nafiziqbal.com` — `/posts` and `/notifications` requ
 | GET | `/notifications?page&limit` | Like/comment history + `unreadCount` |
 | POST | `/notifications/read-all` | Clear the unread badge |
 | WS | `/realtime?token=<jwt>` | `post:new` · `post:deleted` · `post:liked` · `comment:new` · `notification:new` |
-
-## Design
-
-A deliberate identity — **"a pond at night"** — instead of a default social-app skin: deep teal-black ground, a single warm coral accent (likes, primary actions), and a rare aqua glint (brand, focus). Three typefaces with strict roles: Comfortaa for the wordmark, Sora for UI, Atkinson Hyperlegible for reading. The signature interaction: **liking a post drops a stone** — concentric rings ripple out from under your thumb. All brand assets (icon, splash, adaptive icons, this banner) are generated from one reproducible script.
-
-## What I'd add next
-
-Comment editing/deletion · profile pages · E2E tests (Maestro) · CI pipeline running the suite against a Postgres service · iOS push (needs `@react-native-firebase/messaging` for FCM tokens on iOS) · S3-style media posts · cursor-based pagination once feeds grow.
