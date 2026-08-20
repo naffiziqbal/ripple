@@ -8,6 +8,7 @@ Full-stack TypeScript: Express 5 API on PostgreSQL with JWT + rotating refresh t
 
 ## Try it in 60 seconds
 
+- 💻 **Use it in the browser right now:** [ripple.nafiziqbal.com](https://ripple.nafiziqbal.com)
 - 📱 **Install the production app (Android):** [download APK](https://drive.google.com/file/d/1BWK35WeRXtWv0zr9HQhEYz3ZWZW0iyf7/view?usp=sharing) — standalone, no setup, runs against the live API
 - 🌐 **Live API:** `https://api.ripple.nafiziqbal.com` ([health](https://api.ripple.nafiziqbal.com/health))
 - Sign up with a real email, post something, then like it from a second account — the push notification and the real-time feed update both land within a second.
