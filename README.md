@@ -1,114 +1,129 @@
 ![Ripple](mobile/assets/images/brand-banner.png)
 
-# 🌊 Ripple — Mini Social Feed
+# Ripple
 
-A lightweight social app: post short text updates, scroll a shared feed, like and comment, and get push notifications (Firebase Cloud Messaging) when someone interacts with your posts.
+**A real-time social feed app — post short thoughts, watch likes and comments ripple across every connected device in about a second.**
 
-| Part | Stack |
+Full-stack TypeScript: Express 5 API on PostgreSQL with JWT + rotating refresh tokens, and a React Native (Expo) app styled with Tailwind. Push notifications via Firebase Cloud Messaging, live updates over WebSocket, transactional email via Firebase Auth + Resend.
+
+## Try it in 60 seconds
+
+- 📱 **Install the production app (Android):** [download APK](https://expo.dev/artifacts/eas/OLjXhgswGVEdNa1P1ukxA-mJYZq6iKL-0tGcid8FI8o.apk) — standalone, no setup, runs against the live API
+- 🌐 **Live API:** `https://api.ripple.nafiziqbal.com` ([health](https://api.ripple.nafiziqbal.com/health))
+- Sign up with a real email, post something, then like it from a second account — the push notification and the real-time feed update both land within a second.
+
+## Features
+
+**Product**
+- Text posts (500 chars) in a shared feed — infinite scroll, pull-to-refresh, filter by author
+- Like (optimistic, with a signature "ripple" animation) and threaded comments with pagination
+- **Real-time**: other users' posts, likes, and comments appear within ~1s over WebSocket (60s polling fallback)
+- **Push notifications** (FCM) when your post is liked or commented — tapping opens the thread
+- In-app notification center with unread badge
+- Email accounts: signup with mandatory email, login with username *or* email, account-creation email, and a fully in-app password reset (6-digit OTP by email → verify → new password)
+- Delete your own posts; session survives app restarts
+
+**Engineering**
+- JWT access tokens (15 min) + **rotating refresh tokens** with reuse detection (a replayed token revokes every session for that user)
+- Firebase Auth as the credential store (server-mediated via REST — no Firebase SDK in the app), Postgres as the domain store, graceful bcrypt fallback when Firebase is unconfigured
+- OTP reset: hashed codes, 10-min expiry, 5-attempt lockout, single-purpose reset tokens, all sessions revoked on reset
+- Rate limiting (credential endpoints 10/min per IP), `helmet`, Zod validation at every edge, uniform login errors with timing-safe comparisons
+- Feed queries avoid N+1: counts, `likedByMe`, and comment previews computed in single queries (window functions, `ANY($1::int[])` batching)
+- Push + email are fire-and-forget and degrade to log-only when unconfigured — the API never fails because a side effect did
+- **42 integration tests** (Supertest against a real Postgres test database, including a live WebSocket test)
+
+## Stack
+
+| | |
 | --- | --- |
-| `backend/` | Node.js · Express 5 · TypeScript · PostgreSQL (pg) · JWT · Zod · Firebase Admin (FCM) · Vitest + Supertest |
-| `mobile/` | React Native · Expo (expo-router) · TypeScript · NativeWind (Tailwind CSS) · TanStack Query · expo-notifications |
+| **API** | Node.js · Express 5 · TypeScript · PostgreSQL (`pg`, hand-written SQL) · Zod · `ws` · firebase-admin · nodemailer |
+| **App** | React Native · Expo SDK 57 (expo-router) · TypeScript · NativeWind (Tailwind) · TanStack Query · expo-notifications |
+| **Infra** | Docker Compose (Postgres) · EAS Build · Firebase (Auth + FCM) · Resend (SMTP) |
+| **Testing** | Vitest 4 · Supertest · dedicated auto-created test database |
 
----
+## Architecture
 
-## Quick start
+```
+mobile (Expo)                      backend (Express)
+┌─────────────────────┐            ┌──────────────────────────────┐
+│ expo-router screens │── HTTPS ──▶│ routers → services → pg pool │
+│ TanStack Query      │            │   Zod validation · ApiError  │
+│ optimistic updates  │◀── WSS ────│ ws server ◀─ event bus       │
+│ FCM device token    │            │   (decoupled via emitter)    │
+└─────────────────────┘            └──────┬───────────┬───────────┘
+                                          ▼           ▼
+                                   PostgreSQL   Firebase (Auth+FCM) · Resend
+```
 
-### 1. Backend
+- **Layered modules** (`auth`, `posts`, `notifications`): thin routers → services holding business logic → one migrated connection pool. Swapping any external service touches one module.
+- **Realtime is decoupled**: domain services emit typed events to an in-process bus; the WebSocket layer subscribes. Feed events broadcast; notification events target only the recipient's sockets.
+- **Auth split**: Firebase owns passwords (so reset genuinely works), Postgres owns identity (username, profile, relations), our JWT layer owns sessions. The mobile client auto-refreshes on 401 with a single-flight rotation and logs out when rotation fails.
 
+## Running locally
+
+**Backend** (needs Docker):
 ```bash
 cd backend
-npm install
-docker compose up -d   # starts PostgreSQL 16 (user/pass/db: ripple) on host port 5433
-cp .env.example .env   # optional — sensible dev defaults are built in
-npm run dev            # → http://localhost:4000
+pnpm install            # or npm install
+docker compose up -d    # PostgreSQL 16 on host port 5433 (avoids clashing with a local 5432)
+cp .env.example .env    # dev defaults work out of the box
+pnpm dev                # → http://localhost:4000
 ```
+Schema migrates automatically on boot. Without Firebase/SMTP credentials everything still runs: pushes and OTP emails print to stdout instead of sending.
 
-- The schema is migrated automatically on boot (idempotent `CREATE TABLE IF NOT EXISTS`).
-- Host port **5433** is used on purpose so an existing local Postgres on 5432 never conflicts (`POSTGRES_PORT` overrides it; keep `DATABASE_URL` in sync).
-- Already running Postgres yourself? Just set `DATABASE_URL` in `.env` and skip Docker.
-- Without a Firebase service account the API runs in **log-only push mode** (notifications are printed to stdout), so everything works locally with zero Firebase setup.
-
-Run the test suite (33 integration tests against a dedicated `ripple_test` database, created automatically — covers auth + refresh rotation, feed, likes, comments, notifications, and the realtime WebSocket):
-
-```bash
-npm test        # vitest + supertest
-npm run typecheck
-```
-
-### 2. Mobile app
-
+**Mobile:**
 ```bash
 cd mobile
 npm install
-npx expo start
+npx expo start          # scan the QR with Expo Go (same Wi-Fi — API host auto-detected)
 ```
+Point at any API with `EXPO_PUBLIC_API_URL=http://<host>:4000 npx expo start`.
 
-Open in **Expo Go** (same Wi-Fi as your machine — the app auto-detects the API host from the Metro bundler) or run an emulator. To point at a different API host:
-
+**Tests:**
 ```bash
-EXPO_PUBLIC_API_URL=http://192.168.1.50:4000 npx expo start
+cd backend && pnpm test   # 42 integration tests; creates ripple_test db automatically
 ```
 
-### 3. Firebase push notifications (optional, needed for real FCM)
+### Full credentials (optional, for push + real emails)
 
-1. Create a Firebase project → **Project settings → Service accounts → Generate new private key**, save it as `backend/firebase-service-account.json` (or set `FIREBASE_SERVICE_ACCOUNT` in `.env`).
-2. Add an Android app in Firebase (package `com.ripple.app`), download `google-services.json` into `mobile/`, and add `"googleServicesFile": "./google-services.json"` under `android` in `mobile/app.json`.
-3. Remote push requires a **development build** (Expo Go can't receive FCM):
-   ```bash
-   cd mobile && npx expo run:android   # or: eas build --profile development
-   ```
-4. Log in on a device → the app registers its FCM token via `PUT /auth/device-token` → likes/comments from other users arrive as push notifications; tapping one deep-links to the post.
+| What | Where | Enables |
+| --- | --- | --- |
+| `backend/firebase-service-account.json` | Firebase console → Service accounts | FCM push sending, Admin password updates |
+| `FIREBASE_WEB_API_KEY` in `backend/.env` | `google-services.json` → `api_key` | Firebase email auth + account-creation mail |
+| `SMTP_URL` in `backend/.env` | Resend/Brevo/any SMTP | Real OTP reset emails |
+| `mobile/google-services.json` | Firebase console → Android app | FCM token on device (also stored as an EAS file env var for cloud builds) |
 
----
+> **Push requires a dev/production build** — Expo Go cannot receive remote notifications (SDK 53+ platform restriction). The app detects Expo Go and degrades gracefully. Build with `npx eas-cli build -p android --profile development`.
 
-## API overview
+## API reference
 
-Base URL: `http://localhost:4000` — all `/posts` routes require `Authorization: Bearer <token>`.
+Base: `https://api.ripple.nafiziqbal.com` — `/posts` and `/notifications` require `Authorization: Bearer <token>`.
 
 | Method | Route | Description |
 | --- | --- | --- |
-| POST | `/auth/signup` | Create account `{ username, password }` → `{ token, refreshToken, user }` |
-| POST | `/auth/login` | Log in → `{ token, refreshToken, user }` |
-| POST | `/auth/refresh` | Rotate refresh token → new `{ token, refreshToken }` (reuse detection revokes all sessions) |
+| POST | `/auth/signup` | `{ username, email, password }` → `{ token, refreshToken, user }` + account-creation email |
+| POST | `/auth/login` | `{ identifier, password }` — identifier is username **or** email |
+| POST | `/auth/refresh` | Rotate refresh token; reuse detection revokes all sessions |
 | POST | `/auth/logout` | Revoke a refresh token |
-| POST | `/auth/forgot-password` | Email a 6-digit reset code `{ identifier }` (username or email; 404 if no such account) |
-| POST | `/auth/verify-reset-otp` | Verify the code (5 attempts, 10-min expiry) → short-lived `resetToken` |
-| POST | `/auth/reset-password` | Set new password `{ resetToken, password }`; revokes all sessions |
-| GET | `/auth/me` | Current user from token |
-| PUT | `/auth/device-token` | Register FCM device token `{ token }` |
-| GET | `/posts?page=1&limit=10&username=alice` | Paginated feed, newest first; optional author filter |
-| POST | `/posts` | Create text post `{ content }` (≤ 500 chars) |
-| GET | `/posts/:id` | Single post with counts + `likedByMe` |
-| DELETE | `/posts/:id` | Delete your own post (403 otherwise) |
+| POST | `/auth/forgot-password` | Email a 6-digit reset code (404 if no such account) |
+| POST | `/auth/verify-reset-otp` | Verify code (5 attempts, 10-min TTL) → short-lived `resetToken` |
+| POST | `/auth/reset-password` | Set new password; revokes every session |
+| GET | `/auth/me` | Current user |
+| PUT | `/auth/device-token` | Register FCM device token |
+| GET | `/posts?page&limit&username` | Paginated feed, newest first, optional author filter |
+| POST | `/posts` | Create a text post (≤500 chars) |
+| GET / DELETE | `/posts/:id` | Read / delete own post (403 otherwise) |
 | POST | `/posts/:id/like` | Toggle like → `{ liked, likeCount }` (notifies author) |
-| POST | `/posts/:id/comment` | Add comment `{ content }` (notifies author) |
-| GET | `/posts/:id/comments?page&limit` | Paginated comment list, oldest first |
-| GET | `/notifications?page&limit` | Your like/comment history + `unreadCount` |
+| POST | `/posts/:id/comment` | Add comment (notifies author) |
+| GET | `/posts/:id/comments?page&limit` | Paginated comments, oldest first |
+| GET | `/notifications?page&limit` | Like/comment history + `unreadCount` |
 | POST | `/notifications/read-all` | Clear the unread badge |
-| WS | `/realtime?token=<jwt>` | Live events: `post:new`, `post:deleted`, `post:liked`, `comment:new`, `notification:new` |
+| WS | `/realtime?token=<jwt>` | `post:new` · `post:deleted` · `post:liked` · `comment:new` · `notification:new` |
 
-Access tokens are short-lived (15 min); the mobile client transparently rotates the refresh token on 401 (single-flight) and logs out when rotation fails. `/auth/*` credential endpoints are rate-limited (10/min per IP) with a 300/min global limit, behind `helmet` headers.
+## Design
 
-Feed items include `likeCount`, `commentCount`, `likedByMe`, and a two-comment `recentComments` preview so the feed renders without N+1 requests.
+A deliberate identity — **"a pond at night"** — instead of a default social-app skin: deep teal-black ground, a single warm coral accent (likes, primary actions), and a rare aqua glint (brand, focus). Three typefaces with strict roles: Comfortaa for the wordmark, Sora for UI, Atkinson Hyperlegible for reading. The signature interaction: **liking a post drops a stone** — concentric rings ripple out from under your thumb. All brand assets (icon, splash, adaptive icons, this banner) are generated from one reproducible script.
 
----
+## What I'd add next
 
-## Design notes
-
-**Backend**
-- **Layered modules** (`modules/auth`, `modules/posts`, `modules/notifications`): thin routers → services holding business logic → a shared PostgreSQL pool with idempotent boot-time migration. Hand-written parameterized SQL — no ORM overhead, no injection surface.
-- **Validation at the edge** with Zod schemas; typed request helpers (`parseBody`/`parseQuery`/`parseIdParam`) return `400` with field-level details.
-- **Typed error handling**: `ApiError` + a single error middleware; Express 5 forwards async throws natively.
-- **Security details**: bcrypt password hashing, uniform login errors with dummy-hash comparison to avoid username-timing oracles, case-insensitive unique usernames enforced by a functional unique index (no check-then-insert race), JWT config via validated env.
-- **Query craft**: feed counts and `likedByMe` computed in one query; comment previews batched with a `ROW_NUMBER()` window over `ANY($1::int[])` — no N+1; like toggle is a delete-first + `ON CONFLICT DO NOTHING` insert, race-safe without explicit locking.
-- **Push notifications are fire-and-forget** — FCM failure can never fail or slow the originating request, and the service degrades to log-only mode when unconfigured. Every like/comment also lands as a persistent row in `notifications`, powering the in-app notification center and unread badge.
-- **Realtime**: a `ws` WebSocket endpoint fed by an in-process event bus (`realtime/events.ts`) keeps domain services decoupled from transport; feed events broadcast, notification events target only the recipient. The app falls back to 60s polling if the socket drops.
-- **Auth hardening**: 15-minute access tokens with rotating refresh tokens (sha256-hashed at rest, reuse detection revokes all sessions), rate-limited credential endpoints, `helmet` headers.
-- **Tests are integration-level** (Supertest against the real app + a real Postgres test database, truncated between tests), covering auth, pagination, filtering, like toggling, comments, and authorization failures.
-
-**Mobile**
-- **expo-router protected stacks**: `(auth)` and `(app)` groups guarded by session state — no manual navigation on login/logout, the router re-renders to the right stack.
-- **TanStack Query** for all server state: infinite-scroll feed (`useInfiniteQuery`), pull-to-refresh, and **optimistic like toggling** with rollback on error across every cached feed and the post detail view.
-- **NativeWind (Tailwind)** styling with a small design-token theme (`brand` / `ink` / `surface`), reusable `Button`/`Field`/`EmptyState` primitives.
-- **Typed API client** mirroring the backend DTOs; base URL auto-derives from the Metro host so Expo Go on a phone hits your dev machine without config.
-- **Notifications**: foreground display handler, Android channel setup, token registration after login, and tap → deep link to the relevant post.
+Comment editing/deletion · profile pages · E2E tests (Maestro) · CI pipeline running the suite against a Postgres service · iOS push (needs `@react-native-firebase/messaging` for FCM tokens on iOS) · S3-style media posts · cursor-based pagination once feeds grow.
