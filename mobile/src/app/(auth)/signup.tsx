@@ -51,7 +51,7 @@ export default function SignupScreen() {
   return (
     <KeyboardAvoidingView className="flex-1 bg-abyss" behavior="padding">
       <ScrollView
-        contentContainerClassName="flex-grow justify-center px-7 py-12"
+        contentContainerClassName="w-full max-w-[480px] flex-grow justify-center self-center px-7 py-12"
         style={{ paddingTop: insets.top }}
         keyboardShouldPersistTaps="handled"
       >

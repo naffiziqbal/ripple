@@ -3,7 +3,6 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { confirmDestructive } from '../../lib/confirm';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PostCard } from '../../components/post-card';
 import { useToast } from '../../components/toast';
@@ -51,19 +51,17 @@ export default function FeedScreen() {
   const unreadCount = notifications.data?.pages[0]?.unreadCount ?? 0;
 
   function confirmDelete(post: Post) {
-    Alert.alert('Delete this thought?', 'It disappears for everyone.', [
-      { text: 'Keep it', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () =>
-          deletePost.mutate(post.id, {
-            onSuccess: () => toast.show('Post deleted'),
-            onError: (err) =>
-              toast.show(err instanceof Error ? err.message : 'Delete failed', 'error'),
-          }),
-      },
-    ]);
+    confirmDestructive({
+      title: 'Delete this thought?',
+      message: 'It disappears for everyone.',
+      confirmLabel: 'Delete',
+      onConfirm: () =>
+        deletePost.mutate(post.id, {
+          onSuccess: () => toast.show('Post deleted'),
+          onError: (err) =>
+            toast.show(err instanceof Error ? err.message : 'Delete failed', 'error'),
+        }),
+    });
   }
 
   function applyFilter() {
@@ -87,7 +85,7 @@ export default function FeedScreen() {
       {/* Custom header: full styling control (the native Android header
           mangled the badge rendering on some OEM skins). */}
       <View
-        className="flex-row items-center justify-between px-5 pb-1"
+        className="w-full max-w-[640px] flex-row items-center justify-between self-center px-5 pb-1"
         style={{ paddingTop: insets.top + 10 }}
       >
         <Wordmark size={22} />
@@ -138,7 +136,7 @@ export default function FeedScreen() {
         </View>
       </View>
 
-      <View className="px-5 pb-3 pt-2">
+      <View className="w-full max-w-[640px] self-center px-5 pb-3 pt-2">
         <View className="h-12 flex-row items-center gap-2.5 rounded-full border border-foam/10 bg-depth px-4">
           <Ionicons name="search" size={16} color={colors.mist} />
           <TextInput
@@ -194,7 +192,7 @@ export default function FeedScreen() {
               {...(item.author.id === user?.id ? { onDelete: confirmDelete } : {})}
             />
           )}
-          contentContainerClassName="gap-3.5 px-5 pb-32 pt-1"
+          contentContainerClassName="w-full max-w-[640px] gap-3.5 self-center px-5 pb-32 pt-1"
           refreshControl={
             <RefreshControl
               refreshing={feed.isRefetching && !feed.isFetchingNextPage}

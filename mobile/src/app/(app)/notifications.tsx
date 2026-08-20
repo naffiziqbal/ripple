@@ -88,7 +88,7 @@ export default function NotificationsScreen() {
             }
           />
         )}
-        contentContainerClassName="gap-3 p-5"
+        contentContainerClassName="w-full max-w-[640px] gap-3 self-center p-5"
         onEndReached={() => {
           if (notifications.hasNextPage && !notifications.isFetchingNextPage) {
             void notifications.fetchNextPage();

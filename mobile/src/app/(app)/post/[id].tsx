@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Pressable,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { confirmDestructive } from '../../../lib/confirm';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, PostCard } from '../../../components/post-card';
 import { useToast } from '../../../components/toast';
@@ -76,22 +76,20 @@ export default function PostDetailScreen() {
   }
 
   function confirmDelete(target: Post) {
-    Alert.alert('Delete this thought?', 'It disappears for everyone.', [
-      { text: 'Keep it', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () =>
-          deletePost.mutate(target.id, {
-            onSuccess: () => {
-              toast.show('Post deleted');
-              router.back();
-            },
-            onError: (err) =>
-              toast.show(err instanceof Error ? err.message : 'Delete failed', 'error'),
-          }),
-      },
-    ]);
+    confirmDestructive({
+      title: 'Delete this thought?',
+      message: 'It disappears for everyone.',
+      confirmLabel: 'Delete',
+      onConfirm: () =>
+        deletePost.mutate(target.id, {
+          onSuccess: () => {
+            toast.show('Post deleted');
+            router.back();
+          },
+          onError: (err) =>
+            toast.show(err instanceof Error ? err.message : 'Delete failed', 'error'),
+        }),
+    });
   }
 
   if (post.isLoading) {
@@ -123,7 +121,7 @@ export default function PostDetailScreen() {
         data={commentItems}
         keyExtractor={(comment) => String(comment.id)}
         renderItem={({ item }) => <CommentRow comment={item} />}
-        contentContainerClassName="gap-3 px-5 py-4"
+        contentContainerClassName="w-full max-w-[640px] gap-3 self-center px-5 py-4"
         ListHeaderComponent={
           <View className="mb-2 gap-4">
             <PostCard
@@ -164,9 +162,10 @@ export default function PostDetailScreen() {
       />
 
       <View
-        className="flex-row items-end gap-3 border-t border-foam/10 bg-abyss px-5 pt-3"
+        className="border-t border-foam/10 bg-abyss px-5 pt-3"
         style={{ paddingBottom: Math.max(insets.bottom, 14) }}
       >
+        <View className="w-full max-w-[640px] flex-row items-end gap-3 self-center">
         <TextInput
           value={draft}
           onChangeText={setDraft}
@@ -193,6 +192,7 @@ export default function PostDetailScreen() {
             <Ionicons name="arrow-up" size={22} color={colors.abyss} />
           )}
         </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );

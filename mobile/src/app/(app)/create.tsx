@@ -47,7 +47,7 @@ export default function CreatePostScreen() {
         }}
       />
 
-      <View className="flex-1 gap-4 p-5">
+      <View className="w-full max-w-[640px] flex-1 gap-4 self-center p-5">
         <ErrorBanner
           message={
             createPost.isError
