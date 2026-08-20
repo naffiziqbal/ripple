@@ -11,6 +11,10 @@ import { postsRouter } from './modules/posts/posts.router';
 export function createApp(): Express {
   const app = express();
 
+  // Behind nginx: trust the single reverse-proxy hop so req.ip is the real
+  // client address (rate limiters bucket per client, not per proxy).
+  app.set('trust proxy', 1);
+
   app.use(helmet());
   app.use(cors());
   app.use(express.json({ limit: '100kb' }));
