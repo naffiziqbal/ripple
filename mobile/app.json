@@ -8,11 +8,6 @@
     "scheme": "ripple",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#081112",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#081112"
-    },
     "ios": {
       "bundleIdentifier": "com.ripple.app",
       "supportsTablet": true
